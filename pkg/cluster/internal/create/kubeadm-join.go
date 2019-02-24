@@ -215,7 +215,7 @@ func getJoinAddress(ec *execContext) (string, error) {
 	}
 
 	// gets the IP of the bootstrap control plane node
-	controlPlaneIP, err := controlPlaneHandle.IP()
+	controlPlaneIP, err := controlPlaneHandle.IP(ec.Context.IPv6)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get IP for node")
 	}

@@ -61,7 +61,7 @@ func runHAProxy(ec *execContext, configNode *NodeReplica) error {
 		}
 
 		// gets the IP of the control plane node
-		controlPlaneIP, err := controlPlaneHandle.IP()
+		controlPlaneIP, err := controlPlaneHandle.IP(ec.Context.IPv6)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get IP for node %s", n.Name)
 		}

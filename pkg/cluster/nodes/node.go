@@ -71,6 +71,7 @@ func (n *Node) Command(command string, args ...string) exec.Cmd {
 type nodeCache struct {
 	kubernetesVersion string
 	ip                string
+	ipv6              string
 	ports             map[int]int
 	role              config.NodeRole
 	containerCmder    exec.Cmder
@@ -218,21 +219,28 @@ func (n *Node) KubeVersion() (version string, err error) {
 }
 
 // IP returns the IP address of the node
-func (n *Node) IP() (ip string, err error) {
+func (n *Node) IP(isIPv6 bool) (ip string, err error) {
+	// Check the IP version
+	cachedIP := &n.nodeCache.ip
+	IPAddress := "IPAddress"
+	if isIPv6 {
+		cachedIP = &n.nodeCache.ipv6
+		IPAddress = "GlobalIPv6Address"
+	}
 	// use the cached version first
-	if n.nodeCache.ip != "" {
-		return n.nodeCache.ip, nil
+	if *cachedIP != "" {
+		return *cachedIP, nil
 	}
 	// retrive the IP address of the node using docker inspect
-	lines, err := docker.Inspect(n.nameOrID, "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}")
+	lines, err := docker.Inspect(n.nameOrID, fmt.Sprintf("{{range .NetworkSettings.Networks}}{{.%s}}{{end}}", IPAddress))
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get file")
 	}
 	if len(lines) != 1 {
 		return "", errors.Errorf("file should only be one line, got %d lines", len(lines))
 	}
-	n.nodeCache.ip = lines[0]
-	return n.nodeCache.ip, nil
+	*cachedIP = lines[0]
+	return *cachedIP, nil
 }
 
 // Ports returns a specific port mapping for the node
@@ -283,6 +291,7 @@ func (n *Node) Role() (role config.NodeRole, err error) {
 
 // matches kubeconfig server entry like:
 //    server: https://172.17.0.2:6443
+//    server: https://[2010:836B:4179::836B:4179]:6443
 // which we rewrite to:
 //    server: https://localhost:$PORT
 var serverAddressRE = regexp.MustCompile(`^(\s+server:) https://.*:\d+$`)

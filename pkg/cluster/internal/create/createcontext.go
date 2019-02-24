@@ -42,6 +42,7 @@ type Context struct {
 	Config *config.Config
 	*DerivedConfig
 	Retain      bool         // if we should retain nodes after failing to create.
+	IPv6        bool         // use IPv6 to configure the cluster.
 	ExecOptions []ExecOption // options to be forwarded to the exec command.
 }
 

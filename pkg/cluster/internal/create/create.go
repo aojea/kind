@@ -80,6 +80,9 @@ func Cluster(c *context.Context, cfg *config.Config, opts *Options) error {
 	if opts.WaitForReady != time.Duration(0) {
 		cc.ExecOptions = append(cc.ExecOptions, WaitForReady(opts.WaitForReady))
 	}
+	if opts.IPv6 {
+		cc.IPv6 = true
+	}
 
 	// attempt to explicitly pull the required node images if they doesn't exist locally
 	// we don't care if this errors, we'll still try to run which also pulls

@@ -68,6 +68,13 @@ func runKubeadmConfig(ec *execContext, configNode *NodeReplica) error {
 		return errors.Wrap(err, "failed to get kubernetes version from node: %v")
 	}
 
+	// get the address the API Server will advertise to other members of the cluster
+	apiAdvertiseAddress, err := node.IP(ec.Context.IPv6)
+	if err != nil {
+		return errors.Wrap(err, "failed to get IP for bootsrap node")
+	}
+	log.Infof("API Advertise Address:\n\n%s\n", apiAdvertiseAddress)
+
 	// get the control plane endpoint, in case the cluster has an external load balancer in
 	// front of the control-plane nodes
 	controlPlaneEndpoint, err := getControlPlaneEndpoint(ec)
@@ -75,6 +82,17 @@ func runKubeadmConfig(ec *execContext, configNode *NodeReplica) error {
 		// TODO(bentheelder): logging here
 		return err
 	}
+
+	if controlPlaneEndpoint == "" {
+		// gets the IP of the bootstrap control plane node
+		if ec.Context.IPv6 {
+			controlPlaneEndpoint = fmt.Sprintf("[%s]:%d", apiAdvertiseAddress, kubeadm.APIServerPort)
+		} else {
+			controlPlaneEndpoint = fmt.Sprintf("%s:%d", apiAdvertiseAddress, kubeadm.APIServerPort)
+		}
+	}
+
+	log.Infof("Control Plane Endpoint:\n\n%s\n", controlPlaneEndpoint)
 
 	// get kubeadm config content
 	kubeadmConfig, err := getKubeadmConfig(
@@ -84,6 +102,7 @@ func runKubeadmConfig(ec *execContext, configNode *NodeReplica) error {
 			ClusterName:          ec.Name(),
 			KubernetesVersion:    kubeVersion,
 			ControlPlaneEndpoint: controlPlaneEndpoint,
+			APIAdvertiseAddress:  apiAdvertiseAddress,
 			APIBindPort:          kubeadm.APIServerPort,
 			Token:                kubeadm.Token,
 		},
@@ -116,7 +135,7 @@ func getControlPlaneEndpoint(ec *execContext) (string, error) {
 	}
 
 	// gets the IP of the load balancer
-	loadBalancerIP, err := loadBalancerHandle.IP()
+	loadBalancerIP, err := loadBalancerHandle.IP(ec.Context.IPv6)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get IP for node: %s", ec.ExternalLoadBalancer().Name)
 	}

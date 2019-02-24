@@ -32,6 +32,8 @@ type ConfigData struct {
 	KubernetesVersion string
 	// The ControlPlaneEndpoint, that is the address of the external loadbalancer, if defined
 	ControlPlaneEndpoint string
+	// The local API Server address
+	APIAdvertiseAddress string
 	// The Local API Server port
 	APIBindPort int
 	// The Token for TLS bootstrap
@@ -74,11 +76,14 @@ clusterName: "{{.ClusterName}}"
 bootstrapTokens:
 - token: "{{ .Token }}"
 {{ if .ControlPlaneEndpoint -}}
-controlPlaneEndpoint: {{ .ControlPlaneEndpoint }}
+controlPlaneEndpoint: "{{ .ControlPlaneEndpoint }}"
 {{- end }}
 # we use a well know port for making the API server discoverable inside docker network. 
 # from the host machine such port will be accessible via a random local port instead.
 api:
+  {{ if .APIAdvertiseAddress -}}
+  advertiseAddress: "{{ .APIAdvertiseAddress }}"
+  {{- end }}
   bindPort: {{.APIBindPort}}
 # we need nsswitch.conf so we use /etc/hosts
 # https://github.com/kubernetes/kubernetes/issues/69195
@@ -114,7 +119,7 @@ metadata:
 kubernetesVersion: {{.KubernetesVersion}}
 clusterName: "{{.ClusterName}}"
 {{ if .ControlPlaneEndpoint -}}
-controlPlaneEndpoint: {{ .ControlPlaneEndpoint }}
+controlPlaneEndpoint: "{{ .ControlPlaneEndpoint }}"
 {{- end }}
 # we need nsswitch.conf so we use /etc/hosts
 # https://github.com/kubernetes/kubernetes/issues/69195
@@ -139,6 +144,9 @@ bootstrapTokens:
 # we use a well know port for making the API server discoverable inside docker network. 
 # from the host machine such port will be accessible via a random local port instead.
 apiEndpoint:
+  {{ if .APIAdvertiseAddress -}}
+  advertiseAddress: "{{ .APIAdvertiseAddress }}"
+  {{- end }}
   bindPort: {{.APIBindPort}}
 ---
 # no-op entry that exists solely so it can be patched
@@ -176,7 +184,7 @@ metadata:
 kubernetesVersion: {{.KubernetesVersion}}
 clusterName: "{{.ClusterName}}"
 {{ if .ControlPlaneEndpoint -}}
-controlPlaneEndpoint: {{ .ControlPlaneEndpoint }}
+controlPlaneEndpoint: "{{ .ControlPlaneEndpoint }}"
 {{- end }}
 # on docker for mac we have to expose the api server via port forward,
 # so we need to ensure the cert is valid for localhost so we can talk
@@ -194,6 +202,9 @@ bootstrapTokens:
 # we use a well know port for making the API server discoverable inside docker network. 
 # from the host machine such port will be accessible via a random local port instead.
 localAPIEndpoint:
+  {{ if .APIAdvertiseAddress -}}
+  advertiseAddress: "{{ .APIAdvertiseAddress }}"
+  {{- end }}
   bindPort: {{.APIBindPort}}
 ---
 # no-op entry that exists solely so it can be patched
