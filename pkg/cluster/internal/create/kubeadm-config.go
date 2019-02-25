@@ -73,7 +73,6 @@ func runKubeadmConfig(ec *execContext, configNode *NodeReplica) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get IP for bootsrap node")
 	}
-	log.Infof("API Advertise Address:\n\n%s\n", apiAdvertiseAddress)
 
 	// get the control plane endpoint, in case the cluster has an external load balancer in
 	// front of the control-plane nodes
@@ -91,8 +90,6 @@ func runKubeadmConfig(ec *execContext, configNode *NodeReplica) error {
 			controlPlaneEndpoint = fmt.Sprintf("%s:%d", apiAdvertiseAddress, kubeadm.APIServerPort)
 		}
 	}
-
-	log.Infof("Control Plane Endpoint:\n\n%s\n", controlPlaneEndpoint)
 
 	// get kubeadm config content
 	kubeadmConfig, err := getKubeadmConfig(
