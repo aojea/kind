@@ -220,5 +220,10 @@ func getJoinAddress(ec *execContext) (string, error) {
 		return "", errors.Wrap(err, "failed to get IP for node")
 	}
 
-	return fmt.Sprintf("%s:%d", controlPlaneIP, kubeadm.APIServerPort), nil
+	if ec.Context.IPv6 {
+		return fmt.Sprintf("[%s]:%d", controlPlaneIP, kubeadm.APIServerPort), nil
+	} else {
+		return fmt.Sprintf("%s:%d", controlPlaneIP, kubeadm.APIServerPort), nil
+	}
+
 }
