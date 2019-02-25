@@ -137,6 +137,10 @@ func getControlPlaneEndpoint(ec *execContext) (string, error) {
 		return "", errors.Wrapf(err, "failed to get IP for node: %s", ec.ExternalLoadBalancer().Name)
 	}
 
+	if ec.Context.IPv6 {
+		return fmt.Sprintf("[%s]:%d", loadBalancerIP, haproxy.ControlPlanePort), nil
+	}
+
 	return fmt.Sprintf("%s:%d", loadBalancerIP, haproxy.ControlPlanePort), nil
 }
 
