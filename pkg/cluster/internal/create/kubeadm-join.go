@@ -77,6 +77,12 @@ func runKubeadmJoinControlPlane(ec *execContext, configNode *NodeReplica) error 
 		return errors.Errorf("unable to get the handle for operating on node: %s", configNode.Name)
 	}
 
+	// get the advertised address
+	advertisedAddress, err := node.IP(ec.Context.IPv6)
+	if err != nil {
+		return errors.Wrap(err, "failed to get IP for node")
+	}
+
 	// creates the folder tree for pre-loading necessary cluster certificates
 	// on the joining node
 	if err := node.Command("mkdir", "-p", "/etc/kubernetes/pki/etcd").Run(); err != nil {
@@ -142,6 +148,8 @@ func runKubeadmJoinControlPlane(ec *execContext, configNode *NodeReplica) error 
 		// preflight errors are expected, in particular for swap being enabled
 		// TODO(bentheelder): limit the set of acceptable errors
 		"--ignore-preflight-errors=all",
+		// use advertise address to avoid issues with Ipv6
+		"--apiserver-advertise-address", advertisedAddress,
 		kubeadmVerbosityFlag,
 	)
 	lines, err := exec.CombinedOutputLines(cmd)
@@ -168,6 +176,12 @@ func runKubeadmJoin(ec *execContext, configNode *NodeReplica) error {
 		return errors.Errorf("unable to get the handle for operating on node: %s", configNode.Name)
 	}
 
+	// get the advertised address
+	advertisedAddress, err := node.IP(ec.Context.IPv6)
+	if err != nil {
+		return errors.Wrap(err, "failed to get IP for node")
+	}
+
 	// run kubeadm join
 	cmd := node.Command(
 		"kubeadm", "join",
@@ -180,6 +194,8 @@ func runKubeadmJoin(ec *execContext, configNode *NodeReplica) error {
 		// preflight errors are expected, in particular for swap being enabled
 		// TODO(bentheelder): limit the set of acceptable errors
 		"--ignore-preflight-errors=all",
+		// use advertise address to avoid issues with Ipv6
+		"--apiserver-advertise-address", advertisedAddress,
 		kubeadmVerbosityFlag,
 	)
 	lines, err := exec.CombinedOutputLines(cmd)
