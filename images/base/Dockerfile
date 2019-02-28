@@ -81,10 +81,10 @@ RUN curl -fsSL "https://download.docker.com/linux/$(. /etc/os-release; echo "$ID
 
 # Install CNI binaries to /opt/cni/bin
 # TODO(bentheelder): doc why / what here
-ARG CNI_VERSION="v0.7.4"
-ARG CNI_TARBALL="cni-plugins-${ARCH}-${CNI_VERSION}.tgz"
-ARG CNI_BASE_URL="https://github.com/containernetworking/plugins/releases/download/"
-ARG CNI_URL="${CNI_BASE_URL}${CNI_VERSION}/${CNI_TARBALL}"
+ARG CNI_VERSION="0.6.0"
+ARG CNI_TARBALL="cni-plugins-${ARCH}-v${CNI_VERSION}.tgz"
+ARG CNI_BASE_URL="https://storage.googleapis.com/kubernetes-release/network-plugins/"
+ARG CNI_URL="${CNI_BASE_URL}${CNI_TARBALL}"
 RUN curl -sSL --retry 5 --output /tmp/cni.tgz "${CNI_URL}" \
     && sha256sum /tmp/cni.tgz \
     && mkdir -p /opt/cni/bin \
