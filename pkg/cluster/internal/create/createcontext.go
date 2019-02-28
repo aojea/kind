@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/kind/pkg/cluster/internal/context"
 	"sigs.k8s.io/kind/pkg/cluster/nodes"
 	"sigs.k8s.io/kind/pkg/container/docker"
-	"sigs.k8s.io/kind/pkg/exec"
 	logutil "sigs.k8s.io/kind/pkg/log"
 )
 
@@ -155,6 +154,15 @@ func (cc *Context) ProvisionNodes() (nodeList map[string]*nodes.Node, err error)
 		}
 		nodeList[configNode.Name] = node
 
+		// enable IPv6 inside the container
+		if cc.IPv6 {
+			cc.Status.Start(fmt.Sprintf("[%s] Enable IPv6 🐋", configNode.Name))
+			if err := node.EnableIPv6(); err != nil {
+				// TODO(bentheelder): logging here
+				return nodeList, err
+			}
+		}
+
 		cc.Status.Start(fmt.Sprintf("[%s] Fixing mounts 🗻", configNode.Name))
 		// we need to change a few mounts once we have the container
 		// we'd do this ahead of time if we could, but --privileged implies things
@@ -187,22 +195,6 @@ func (cc *Context) ProvisionNodes() (nodeList map[string]*nodes.Node, err error)
 		// load the docker image artifacts into the docker daemon
 		cc.Status.Start(fmt.Sprintf("[%s] Pre-loading images 🐋", configNode.Name))
 		node.LoadImages()
-
-		// Fix Docker IPv6 issue https://github.com/containernetworking/cni/issues/531
-		// and enable IPv6 forwarding inside docker
-		if cc.IPv6 {
-			cc.Status.Start(fmt.Sprintf("[%s] Enable IPv6 🐋", configNode.Name))
-			cmd := node.Command("sysctl", "net.ipv6.conf.all.disable_ipv6=0")
-			err := exec.RunLoggingOutputOnFail(cmd)
-			if err != nil {
-				return nodeList, errors.New("failed to enable IPv6 inside docker")
-			}
-			cmd = node.Command("sysctl", "net.ipv6.conf.all.forwarding=1")
-			err = exec.RunLoggingOutputOnFail(cmd)
-			if err != nil {
-				return nodeList, errors.New("failed to enable IPv6 forwarding inside docker")
-			}
-		}
 
 	}
 

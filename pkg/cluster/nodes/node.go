@@ -384,3 +384,32 @@ func (n *Node) SetProxy() error {
 
 	return nil
 }
+
+// Currently we need to configure different sysctl options because of this bug
+// https://github.com/containernetworking/cni/issues/531 and enable Dcoker IPv6 support
+// as described in Docker documentation:
+// https://docs.docker.com/v17.09/engine/userguide/networking/default_network/ipv6/
+func (n *Node) EnableIPv6() error {
+	// configure Docker daemon to use ipv6
+	// we take an unused range otherwise the daemon refuse to start
+	err := n.WriteFile("/etc/docker/daemon.json",
+		"{\n\t\"ipv6\": true,\n\t\"fixed-cidr-v6\": \"fc00:db8:1::/64\"\n}")
+	if err != nil {
+		errors.Wrap(err, "failed to create docker daemon.json")
+	}
+	// enable ipv6 kernet settings
+	cmd := n.Command("sysctl", "net.ipv6.conf.all.disable_ipv6=0")
+	err = exec.RunLoggingOutputOnFail(cmd)
+	if err != nil {
+		errors.Wrap(err, "failed to enable ipv6")
+	}
+	// I think that's redundan with the fixed-cidr-v6 setting
+	// but better to have it to avoid problems with new versions
+	cmd = n.Command("sysctl", "net.ipv6.conf.all.forwarding=1")
+	err = exec.RunLoggingOutputOnFail(cmd)
+	if err != nil {
+		errors.Wrap(err, "failed to enable ipv6 forwarding")
+	}
+
+	return nil
+}
