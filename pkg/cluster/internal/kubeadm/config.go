@@ -38,6 +38,8 @@ type ConfigData struct {
 	APIBindPort int
 	// The Token for TLS bootstrap
 	Token string
+	// IPv4 take precedence over IPv6 by default, use this to set IPv6 default values
+	IPv6 bool
 	// DerivedConfigData is populated by Derive()
 	// These auto-generated fields are available to Config templates,
 	// but not meant to be set by hand
@@ -99,6 +101,11 @@ apiServerExtraVolumes:
 apiServerCertSANs: [localhost]
 kubeletConfiguration:
   baseConfig:
+    # use ipv6 addresses if it is enable
+    {{ if .IPv6 -}}
+    address: "::"
+    healthzBindAddress: "::"
+    {{- end }}
     # disable disk resource management by default
     # kubelet will see the host disk that the inner container runtime
     # is ultimately backed by and attempt to recover disk space.
@@ -159,6 +166,11 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 metadata:
   name: config
+# use ipv6 addresses if it is enable
+{{ if .IPv6 -}}
+address: "::"
+healthzBindAddress: "::"
+{{- end }}
 # disable disk resource management by default
 # kubelet will see the host disk that the inner container runtime
 # is ultimately backed by and attempt to recover disk space. we don't want that.
@@ -217,6 +229,11 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 metadata:
   name: config
+# use ipv6 addresses if it is enable
+{{ if .IPv6 -}}
+address: "::"
+healthzBindAddress: "::"
+{{- end }}
 # disable disk resource management by default
 # kubelet will see the host disk that the inner container runtime
 # is ultimately backed by and attempt to recover disk space. we don't want that.

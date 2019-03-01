@@ -102,6 +102,7 @@ func runKubeadmConfig(ec *execContext, configNode *NodeReplica) error {
 			APIAdvertiseAddress:  apiAdvertiseAddress,
 			APIBindPort:          kubeadm.APIServerPort,
 			Token:                kubeadm.Token,
+			IPv6:                 ec.Context.IPv6,
 		},
 	)
 	if err != nil {
@@ -113,6 +114,13 @@ func runKubeadmConfig(ec *execContext, configNode *NodeReplica) error {
 	if err := node.WriteFile("/kind/kubeadm.conf", kubeadmConfig); err != nil {
 		// TODO(bentheelder): logging here
 		return errors.Wrap(err, "failed to copy kubeadm config to node")
+	}
+
+	// Configure the IP that has to be used by the kubelet
+	kubeletExtraConfig := fmt.Sprintf("KUBELET_EXTRA_ARGS=\"--fail-swap-on=false --node-ip=%s\"", apiAdvertiseAddress)
+	if err := node.WriteFile("/etc/default/kubelet", kubeletExtraConfig); err != nil {
+		// TODO(bentheelder): logging here
+		return errors.Wrap(err, "failed to copy kubelet extra config to node")
 	}
 
 	return nil

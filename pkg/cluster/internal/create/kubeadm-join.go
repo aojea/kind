@@ -134,6 +134,13 @@ func runKubeadmJoinControlPlane(ec *execContext, configNode *NodeReplica) error 
 		}
 	}
 
+	// Configure the IP that has to be used by the kubelet
+	kubeletExtraConfig := fmt.Sprintf("KUBELET_EXTRA_ARGS=\"--fail-swap-on=false --node-ip=%s\"", advertisedAddress)
+	if err := node.WriteFile("/etc/default/kubelet", kubeletExtraConfig); err != nil {
+		// TODO(bentheelder): logging here
+		return errors.Wrap(err, "failed to copy kubelet extra config to node")
+	}
+
 	// run kubeadm join --control-plane
 	cmd := node.Command(
 		"kubeadm", "join",
@@ -180,6 +187,13 @@ func runKubeadmJoin(ec *execContext, configNode *NodeReplica) error {
 	advertisedAddress, err := node.IP(ec.Context.IPv6)
 	if err != nil {
 		return errors.Wrap(err, "failed to get IP for node")
+	}
+
+	// Configure the IP that has to be used by the kubelet
+	kubeletExtraConfig := fmt.Sprintf("KUBELET_EXTRA_ARGS=\"--fail-swap-on=false --node-ip=%s\"", advertisedAddress)
+	if err := node.WriteFile("/etc/default/kubelet", kubeletExtraConfig); err != nil {
+		// TODO(bentheelder): logging here
+		return errors.Wrap(err, "failed to copy kubelet extra config to node")
 	}
 
 	// run kubeadm join
