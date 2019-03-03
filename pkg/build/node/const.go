@@ -206,6 +206,15 @@ spec:
       containers:
       - name: kindnet-cni
         image: aojea/kindnet
+        env:
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
         resources:
           requests:
             cpu: "100m"
