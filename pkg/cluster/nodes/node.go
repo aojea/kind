@@ -385,10 +385,8 @@ func (n *Node) SetProxy() error {
 	return nil
 }
 
-// Currently we need to configure different sysctl options because of this bug
-// https://github.com/containernetworking/cni/issues/531 and enable Dcoker IPv6 support
-// as described in Docker documentation:
-// https://docs.docker.com/v17.09/engine/userguide/networking/default_network/ipv6/
+// EnableIPv6 configures IPv6 in the docker daemon that runs inside the node container
+// and set different sysctl options
 func (n *Node) EnableIPv6() error {
 	// configure Docker daemon to use ipv6
 	// we take an unused range otherwise the daemon refuse to start
