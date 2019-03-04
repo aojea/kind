@@ -1,0 +1,44 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.12
+    working_directory: /go/src/sigs.k8s.io/kind
+    steps:
+      - checkout
+      - run:
+          name: run tests
+          command: |
+            hack/verify-all.sh
+      - run:
+          name: build
+          command: |
+            GOOS=linux go build
+
+  crosscompile:
+    docker:
+      - image: circleci/golang:1.12
+    working_directory: /go/src/sigs.k8s.io/kind
+    steps:
+      - checkout
+      - run: go get -u github.com/mitchellh/gox
+      - run:
+          name: cross compile
+          command: |
+            gox -osarch="linux/amd64 linux/arm darwin/amd64 windows/amd64" -output="dist/kind_{{.OS}}_{{.Arch}}"
+            cd dist/ && gzip *
+      - store_artifacts:
+          path: dist
+
+workflows:
+  version: 2
+  build-deploy:
+    jobs:
+      - build
+      - crosscompile:
+          requires:
+            - build
+          filters:
+            branches:
+              only: ipv6
+
