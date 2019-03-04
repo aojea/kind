@@ -103,6 +103,16 @@ apiVersion: kind.sigs.k8s.io/v1alpha2
 nodes:
 # the control plane node
 - role: control-plane
+  # patch the generated kubeadm config with some extra settings
+  kubeadmConfigPatches:
+  - |
+    apiVersion: kubeadm.k8s.io/v1alpha3
+    kind: ClusterConfiguration
+    metadata:
+      name: config
+    networking:
+      podSubnet: "10.192.0.0/16"
+
 - role: worker
   replicas: 2
 EOF
