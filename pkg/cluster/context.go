@@ -67,6 +67,7 @@ func (c *Context) Name() string {
 // by kind based on the configuration.
 func (c *Context) KubeConfigPath() string {
 	return c.ic.KubeConfigPath()
+}
 
 // Create provisions and starts a kubernetes-in-docker cluster
 func (c *Context) Create(cfg *config.Config, options ...create.ClusterOption) error {

@@ -40,3 +40,11 @@ func WaitForReady(interval time.Duration) ClusterOption {
 		return o
 	}
 }
+
+// IPv6 configures enable IPv6 and configures the cluster to use it
+func IPv6(ipv6 bool) ClusterOption {
+	return func(o *internalcreate.Options) *internalcreate.Options {
+		o.IPv6 = ipv6
+		return o
+	}
+}

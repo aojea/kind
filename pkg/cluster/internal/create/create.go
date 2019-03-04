@@ -36,6 +36,7 @@ import (
 type Options struct {
 	Retain       bool
 	WaitForReady time.Duration
+	IPv6         bool
 }
 
 // Cluster creates a cluster
