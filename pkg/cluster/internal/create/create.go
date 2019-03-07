@@ -37,6 +37,7 @@ type Options struct {
 	Retain       bool
 	WaitForReady time.Duration
 	IPv6         bool
+	CNI          string
 }
 
 // Cluster creates a cluster
@@ -84,6 +85,8 @@ func Cluster(c *context.Context, cfg *config.Config, opts *Options) error {
 	if opts.IPv6 {
 		cc.IPv6 = true
 	}
+
+	cc.CNI = opts.CNI
 
 	// attempt to explicitly pull the required node images if they doesn't exist locally
 	// we don't care if this errors, we'll still try to run which also pulls

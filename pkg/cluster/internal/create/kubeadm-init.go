@@ -105,25 +105,39 @@ func runKubeadmInit(ec *execContext, configNode *NodeReplica) error {
 	// install the CNI network plugin
 	// TODO(bentheelder): support other overlay networks
 	// first probe for a pre-installed manifest
-	haveDefaultCNIManifest := true
-	if err := node.Command("test", "-f", "/kind/manifests/default-cni.yaml").Run(); err != nil {
-		haveDefaultCNIManifest = false
-	}
-	if haveDefaultCNIManifest {
-		// we found the default manifest, install that
-		// the images should already be loaded along with kubernetes
-		if err := node.Command(
-			"kubectl", "create", "--kubeconfig=/etc/kubernetes/admin.conf",
-			"-f", "/kind/manifests/default-cni.yaml",
-		).Run(); err != nil {
-			return errors.Wrap(err, "failed to apply overlay network")
+	log.Debug("CNI option ", ec.Context.CNI, "\n")
+	if ec.Context.CNI == "" {
+		haveDefaultCNIManifest := true
+		if err := node.Command("test", "-f", "/kind/manifests/default-cni.yaml").Run(); err != nil {
+			haveDefaultCNIManifest = false
+		}
+
+		if haveDefaultCNIManifest {
+			// we found the default manifest, install that
+			// the images should already be loaded along with kubernetes
+			if err := node.Command(
+				"kubectl", "create", "--kubeconfig=/etc/kubernetes/admin.conf",
+				"-f", "/kind/manifests/default-cni.yaml",
+			).Run(); err != nil {
+				return errors.Wrap(err, "failed to apply overlay network")
+			}
+		} else {
+			// fallback to our old pattern of installing weave using their recommended method
+			if err := node.Command(
+				"/bin/sh", "-c",
+				`kubectl apply --kubeconfig=/etc/kubernetes/admin.conf -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version --kubeconfig=/etc/kubernetes/admin.conf | base64 | tr -d '\n')"`,
+			).Run(); err != nil {
+				return errors.Wrap(err, "failed to apply overlay network")
+			}
 		}
 	} else {
-		// fallback to our old pattern of installing weave using their recommended method
-		if err := node.Command(
-			"/bin/sh", "-c",
-			`kubectl apply --kubeconfig=/etc/kubernetes/admin.conf -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version --kubeconfig=/etc/kubernetes/admin.conf | base64 | tr -d '\n')"`,
-		).Run(); err != nil {
+		cmd := node.Command(
+			"kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
+			"apply", "-f", ec.Context.CNI,
+		)
+		lines, err := exec.CombinedOutputLines(cmd)
+		log.Debug(strings.Join(lines, "\n"))
+		if err != nil {
 			return errors.Wrap(err, "failed to apply overlay network")
 		}
 	}

@@ -43,6 +43,7 @@ type Context struct {
 	*DerivedConfig
 	Retain      bool         // if we should retain nodes after failing to create.
 	IPv6        bool         // use IPv6 to configure the cluster.
+	CNI         string       // install a different CNI plugin
 	ExecOptions []ExecOption // options to be forwarded to the exec command.
 }
 

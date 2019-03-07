@@ -35,6 +35,7 @@ type flagpole struct {
 	Name      string
 	Config    string
 	ImageName string
+	CNI       string
 	Retain    bool
 	IPv6      bool
 	Wait      time.Duration
@@ -55,6 +56,7 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().StringVar(&flags.Name, "name", cluster.DefaultName, "cluster context name")
 	cmd.Flags().StringVar(&flags.Config, "config", "", "path to a kind config file")
 	cmd.Flags().StringVar(&flags.ImageName, "image", "", "node docker image to use for booting the cluster")
+	cmd.Flags().StringVar(&flags.CNI, "cni", "", "URL with the CNI installation manifest")
 	cmd.Flags().BoolVar(&flags.Retain, "retain", false, "retain nodes for debugging when cluster creation fails")
 	cmd.Flags().BoolVar(&flags.IPv6, "ipv6", false, "creates an IPv6 cluster")
 	cmd.Flags().DurationVar(&flags.Wait, "wait", time.Duration(0), "Wait for control plane node to be ready (default 0s)")
@@ -109,6 +111,7 @@ func runE(flags *flagpole, cmd *cobra.Command, args []string) error {
 		create.Retain(flags.Retain),
 		create.WaitForReady(flags.Wait),
 		create.IPv6(flags.IPv6),
+		create.CNI(flags.CNI),
 	); err != nil {
 		return errors.Wrap(err, "failed to create cluster")
 	}

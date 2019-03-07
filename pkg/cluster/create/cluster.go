@@ -48,3 +48,11 @@ func IPv6(ipv6 bool) ClusterOption {
 		return o
 	}
 }
+
+// CNI install a different CNI plugins using the manifest provided
+func CNI(cni string) ClusterOption {
+	return func(o *internalcreate.Options) *internalcreate.Options {
+		o.CNI = cni
+		return o
+	}
+}
