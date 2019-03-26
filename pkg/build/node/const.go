@@ -71,7 +71,9 @@ data:
           "nodename": "__KUBERNETES_NODE_NAME__",
           "mtu": __CNI_MTU__,
           "ipam": {
-              "type": "calico-ipam"
+              "type": "calico-ipam",
+              "assign_ipv4": "true",
+              "assign_ipv6": "true"
           },
           "policy": {
               "type": "k8s"
@@ -625,6 +627,8 @@ spec:
             # Auto-detect the BGP IP address.
             - name: IP
               value: "autodetect"
+            - name: IP6
+              value: "autodetect"
             # Enable IPIP
             - name: CALICO_IPV4POOL_IPIP
               value: "Always"
@@ -639,6 +643,8 @@ spec:
             # no effect. This should fall within --cluster-cidr.
             - name: CALICO_IPV4POOL_CIDR
               value: "192.168.0.0/16"
+            - name: CALICO_IPV6POOL_CIDR
+              value: "fd80:192:168::/64"
             # Disable file logging so _kubectl logs_ works.
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -647,7 +653,7 @@ spec:
               value: "ACCEPT"
             # Disable IPv6 on Kubernetes.
             - name: FELIX_IPV6SUPPORT
-              value: "false"
+              value: "true"
             # Set Felix logging to "info"
             - name: FELIX_LOGSEVERITYSCREEN
               value: "info"
