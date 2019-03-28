@@ -101,6 +101,7 @@ func createNodeContainers(
 	fns := []func() error{}
 	for _, desiredNode := range desiredNodes {
 		desiredNode := desiredNode // capture loop variable
+<<<<<<< HEAD
 		fns = append(fns, func() error {
 			// create the node into a container (~= docker run -d)
 			_, err := desiredNode.Create(clusterLabel)
@@ -112,6 +113,93 @@ func createNodeContainers(
 	}
 
 	status.End(true)
+=======
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// create the node into a container (docker run, but it is paused, see createNode)
+			node, err := desiredNode.Create(clusterLabel)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			err = fixupNode(node, cfg.Networking.IPFamily == "ipv6")
+			if err != nil {
+				errChan <- err
+				return
+			}
+			errChan <- nil
+		}()
+	}
+
+	// wait for all node creation to be done before closing
+	go func() {
+		defer close(errChan)
+		wg.Wait()
+	}()
+
+	// return the first error encountered if any
+	for err := range errChan {
+		if err != nil {
+			return err
+		}
+	}
+
+	status.End(true)
+	return nil
+}
+
+func fixupNode(node *nodes.Node, isIPv6 bool) error {
+	// we need to change a few mounts once we have the container
+	// we'd do this ahead of time if we could, but --privileged implies things
+	// that don't seem to be configurable, and we need that flag
+	if err := node.FixMounts(); err != nil {
+		// TODO(bentheelder): logging here
+		return err
+	}
+
+	if nodes.NeedProxy() {
+		if err := node.SetProxy(); err != nil {
+			// TODO: logging here
+			return errors.Wrapf(err, "failed to set proxy for node %s", node.Name())
+		}
+	}
+
+	if isIPv6 {
+		if err := node.EnableIPv6(); err != nil {
+			// TODO(bentheelder): logging here
+			return err
+		}
+		// Configure the IP that has to be used by the kubelet
+		_, nodeIPv6, err := node.IP()
+		if err != nil {
+			return errors.Wrap(err, "failed to get IP for node")
+		}
+
+		kubeletExtraConfig := fmt.Sprintf("KUBELET_EXTRA_ARGS=\"--fail-swap-on=false --node-ip=%s\"", nodeIPv6)
+		if err := node.WriteFile("/etc/default/kubelet", kubeletExtraConfig); err != nil {
+			// TODO(bentheelder): logging here
+			return errors.Wrap(err, "failed to copy kubelet extra config to node")
+		}
+
+	}
+
+	// signal the node container entrypoint to continue booting into systemd
+	if err := node.SignalStart(); err != nil {
+		// TODO(bentheelder): logging here
+		return err
+	}
+
+	// wait for docker to be ready
+	if !node.WaitForDocker(time.Now().Add(time.Second * 60)) {
+		// TODO(bentheelder): logging here
+		return errors.Errorf("timed out waiting for docker to be ready on node %s", node.Name())
+	}
+
+	// load the docker image artifacts into the docker daemon
+	node.LoadImages()
+
+>>>>>>> 3f8f3e1... Add IPv6 support
 	return nil
 }
 

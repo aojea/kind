@@ -23,24 +23,33 @@ import (
 	"sigs.k8s.io/kind/pkg/cluster/internal/loadbalancer"
 )
 
-// GetControlPlaneEndpoint returns the control plane endpoint in case the
-// cluster has an external load balancer in front of the control-plane nodes,
+// GetControlPlaneEndpoint returns two stings with the control plane endpoint per ip family
+// in case the cluster has an external load balancer in front of the control-plane nodes,
 // otherwise return an empty string.
-func GetControlPlaneEndpoint(allNodes []Node) (string, error) {
+func GetControlPlaneEndpoint(allNodes []Node) (string, string, error) {
 	node, err := ExternalLoadBalancerNode(allNodes)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// if there is no external load balancer return the empty string
 	if node == nil {
-		return "", nil
+		return "", "", nil
 	}
+<<<<<<< HEAD
 
 	// get the IP and port for the load balancer
 	loadBalancerIP, err := node.IP()
+=======
+	// gets the IP of the load balancer
+	loadBalancerIPv4, loadBalancerIPv6, err := node.IP()
+>>>>>>> 3f8f3e1... Add IPv6 support
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get IP for node: %s", node.Name())
+		return "", "", errors.Wrapf(err, "failed to get IPs for node: %s", node.Name())
 	}
+<<<<<<< HEAD
 
 	return fmt.Sprintf("%s:%d", loadBalancerIP, loadbalancer.ControlPlanePort), nil
+=======
+	return fmt.Sprintf("%s:%d", loadBalancerIPv4, haproxy.ControlPlanePort), fmt.Sprintf("[%s]:%d", loadBalancerIPv6, haproxy.ControlPlanePort), nil
+>>>>>>> 3f8f3e1... Add IPv6 support
 }

@@ -64,10 +64,22 @@ func (a *Action) Execute(ctx *actions.ActionContext) error {
 
 	// get the control plane endpoint, in case the cluster has an external load balancer in
 	// front of the control-plane nodes
-	controlPlaneEndpoint, err := nodes.GetControlPlaneEndpoint(allNodes)
+	controlPlaneEndpoint, controlPlaneEndpointIPv6, err := nodes.GetControlPlaneEndpoint(allNodes)
 	if err != nil {
 		// TODO(bentheelder): logging here
 		return err
+	}
+
+	// get the address the API Server will advertise to other members of the cluster
+	apiAdvertiseAddress, apiAdvertiseAddressIPv6, err := node.IP()
+	if err != nil {
+		return errors.Wrap(err, "failed to get IP for bootstrap node")
+	}
+
+	// configure the right protocol addresses
+	if ctx.Config.Networking.IPFamily == "ipv6" {
+		apiAdvertiseAddress = apiAdvertiseAddressIPv6
+		controlPlaneEndpoint = controlPlaneEndpointIPv6
 	}
 
 	// get kubeadm config content
@@ -79,7 +91,8 @@ func (a *Action) Execute(ctx *actions.ActionContext) error {
 			ControlPlaneEndpoint: controlPlaneEndpoint,
 			APIBindPort:          kubeadm.APIServerPort,
 			Token:                kubeadm.Token,
-			PodSubnet:            "10.244.0.0/16", // TODO: make configurable
+			IPv6:                 ctx.Config.Networking.IPFamily == "ipv6",
+			APIAdvertiseAddress:  apiAdvertiseAddress,
 		},
 	)
 
