@@ -37,10 +37,16 @@ func SetDefaults_Cluster(obj *Cluster) {
 			},
 		}
 	}
-	// default to listening on 127.0.0.1:randomPort
-	// TODO(bentheelder): this defaulting will need to be ipv6 aware as well
+	// default to ipv4
+	if obj.Networking.IpFamily == "" {
+		obj.Networking.IpFamily = "ipv4"
+	}
+	// default to listening on 127.0.0.1:randomPort or ::1: randomPort
 	if obj.Networking.APIServerAddress == "" {
 		obj.Networking.APIServerAddress = "127.0.0.1"
+		if obj.Networking.IpFamily == "ipv6" {
+			obj.Networking.APIServerAddress = "::1"
+		}
 	}
 }
 
