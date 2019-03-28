@@ -111,7 +111,7 @@ func createNodeContainers(
 				errChan <- err
 				return
 			}
-			err = fixupNode(node)
+			err = fixupNode(node, cfg.Networking.IPFamily == "ipv6")
 			if err != nil {
 				errChan <- err
 				return
@@ -137,7 +137,7 @@ func createNodeContainers(
 	return nil
 }
 
-func fixupNode(node *nodes.Node) error {
+func fixupNode(node *nodes.Node, isIPv6 bool) error {
 	// we need to change a few mounts once we have the container
 	// we'd do this ahead of time if we could, but --privileged implies things
 	// that don't seem to be configurable, and we need that flag
@@ -153,6 +153,25 @@ func fixupNode(node *nodes.Node) error {
 		}
 	}
 
+	if isIPv6 {
+		if err := node.EnableIPv6(); err != nil {
+			// TODO(bentheelder): logging here
+			return err
+		}
+		// Configure the IP that has to be used by the kubelet
+		_, nodeIPv6, err := node.IP()
+		if err != nil {
+			return errors.Wrap(err, "failed to get IP for node")
+		}
+
+		kubeletExtraConfig := fmt.Sprintf("KUBELET_EXTRA_ARGS=\"--fail-swap-on=false --node-ip=%s\"", nodeIPv6)
+		if err := node.WriteFile("/etc/default/kubelet", kubeletExtraConfig); err != nil {
+			// TODO(bentheelder): logging here
+			return errors.Wrap(err, "failed to copy kubelet extra config to node")
+		}
+
+	}
+
 	// signal the node container entrypoint to continue booting into systemd
 	if err := node.SignalStart(); err != nil {
 		// TODO(bentheelder): logging here
@@ -160,7 +179,7 @@ func fixupNode(node *nodes.Node) error {
 	}
 
 	// wait for docker to be ready
-	if !node.WaitForDocker(time.Now().Add(time.Second * 30)) {
+	if !node.WaitForDocker(time.Now().Add(time.Second * 60)) {
 		// TODO(bentheelder): logging here
 		return errors.Errorf("timed out waiting for docker to be ready on node %s", node.Name())
 	}

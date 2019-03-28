@@ -54,7 +54,7 @@ defaults
     maxconn                 3000
 
 frontend controlPlane
-    bind *:{{ .ControlPlanePort }}
+    bind :::{{ .ControlPlanePort }} v4v6
     option tcplog
     mode tcp
     default_backend kube-apiservers

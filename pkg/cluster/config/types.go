@@ -88,6 +88,8 @@ const (
 
 // Networking contains cluster wide network settings
 type Networking struct {
+	// IPFamily is the network cluster model, it can be ipv4, ipv6 or dual-stack
+	IPFamily ClusterIPFamily
 	// APIServerPort is the listen port on the host for the Kubernetes API Server
 	// Defaults to a random port on the host
 	APIServerPort int32
@@ -97,3 +99,12 @@ type Networking struct {
 	// Defaults to 127.0.0.1
 	APIServerAddress string
 }
+
+// Networking contains cluster wide network settings
+type ClusterIPFamily string
+
+const (
+	IPv4Family      ClusterIPFamily = "ipv4"
+	IPv6Family      ClusterIPFamily = "ipv6"
+	DualStackFamily ClusterIPFamily = "ipv4-ipv6"
+)
