@@ -25,6 +25,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 )
 
+// Define default Pod and Service subnets to avoid networking problems
+const (
+	DefaultPodSubnet          = "100.64.0.0/12"
+	DefaultServicesSubnet     = "10.96.0.0/12"
+	DefaultPodSubnetIPv6      = "fd00:100:64::/64"
+	DefaultServicesSubnetIPv6 = "fd00:10:96::/112"
+)
+
 // ConfigData is supplied to the kubeadm config template, with values populated
 // by the cluster package
 type ConfigData struct {
@@ -32,10 +40,14 @@ type ConfigData struct {
 	KubernetesVersion string
 	// The ControlPlaneEndpoint, that is the address of the external loadbalancer, if defined
 	ControlPlaneEndpoint string
+	// The local API Server address
+	APIAdvertiseAddress string
 	// The Local API Server port
 	APIBindPort int
 	// The Token for TLS bootstrap
 	Token string
+	// IPv4 values take precedence over IPv6 by default, if true set IPv6 default values
+	IPv6 bool
 	// DerivedConfigData is populated by Derive()
 	// These auto-generated fields are available to Config templates,
 	// but not meant to be set by hand
@@ -47,12 +59,24 @@ type ConfigData struct {
 type DerivedConfigData struct {
 	// DockerStableTag is automatically derived from KubernetesVersion
 	DockerStableTag string
+	// PodSubnet specify range of IP addresses for the pod network.
+	PodSubnet string
+	// ServiceSubnet specify range of IP address for service VIPs.
+	ServiceSubnet string
 }
 
 // Derive automatically derives DockerStableTag if not specified
 func (c *ConfigData) Derive() {
 	if c.DockerStableTag == "" {
 		c.DockerStableTag = strings.Replace(c.KubernetesVersion, "+", "_", -1)
+	}
+
+	// We set always pod and service subnets to avoid they can be override
+	c.PodSubnet = DefaultPodSubnet
+	c.ServiceSubnet = DefaultServicesSubnet
+	if c.IPv6 {
+		c.PodSubnet = DefaultPodSubnetIPv6
+		c.ServiceSubnet = DefaultServicesSubnetIPv6
 	}
 }
 
@@ -74,11 +98,14 @@ clusterName: "{{.ClusterName}}"
 bootstrapTokens:
 - token: "{{ .Token }}"
 {{ if .ControlPlaneEndpoint -}}
-controlPlaneEndpoint: {{ .ControlPlaneEndpoint }}
+controlPlaneEndpoint: "{{ .ControlPlaneEndpoint }}"
 {{- end }}
 # we use a well know port for making the API server discoverable inside docker network. 
 # from the host machine such port will be accessible via a random local port instead.
 api:
+  {{ if .APIAdvertiseAddress -}}
+  advertiseAddress: "{{ .APIAdvertiseAddress }}"
+  {{- end }}
   bindPort: {{.APIBindPort}}
 # we need nsswitch.conf so we use /etc/hosts
 # https://github.com/kubernetes/kubernetes/issues/69195
@@ -94,6 +121,11 @@ apiServerExtraVolumes:
 apiServerCertSANs: [localhost]
 kubeletConfiguration:
   baseConfig:
+    # configure ipv6 addresses in IPv6 mode
+    {{ if .IPv6 -}}
+    address: "::"
+    healthzBindAddress: "::"
+    {{- end }}
     # disable disk resource management by default
     # kubelet will see the host disk that the inner container runtime
     # is ultimately backed by and attempt to recover disk space.
@@ -115,8 +147,11 @@ metadata:
   name: config
 kubernetesVersion: {{.KubernetesVersion}}
 clusterName: "{{.ClusterName}}"
+networking:
+  podSubnet: "{{ .PodSubnet }}"
+  serviceSubnet: "{{ .ServiceSubnet }}"
 {{ if .ControlPlaneEndpoint -}}
-controlPlaneEndpoint: {{ .ControlPlaneEndpoint }}
+controlPlaneEndpoint: "{{ .ControlPlaneEndpoint }}"
 {{- end }}
 # we need nsswitch.conf so we use /etc/hosts
 # https://github.com/kubernetes/kubernetes/issues/69195
@@ -143,6 +178,9 @@ bootstrapTokens:
 # we use a well know port for making the API server discoverable inside docker network. 
 # from the host machine such port will be accessible via a random local port instead.
 apiEndpoint:
+  {{ if .APIAdvertiseAddress -}}
+  advertiseAddress: "{{ .APIAdvertiseAddress }}"
+  {{- end }}
   bindPort: {{.APIBindPort}}
 ---
 # no-op entry that exists solely so it can be patched
@@ -155,6 +193,11 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 metadata:
   name: config
+# configure ipv6 addresses in IPv6 mode
+{{ if .IPv6 -}}
+address: "::"
+healthzBindAddress: "::"
+{{- end }}
 # disable disk resource management by default
 # kubelet will see the host disk that the inner container runtime
 # is ultimately backed by and attempt to recover disk space. we don't want that.
@@ -180,16 +223,34 @@ metadata:
 kubernetesVersion: {{.KubernetesVersion}}
 clusterName: "{{.ClusterName}}"
 {{ if .ControlPlaneEndpoint -}}
-controlPlaneEndpoint: {{ .ControlPlaneEndpoint }}
+controlPlaneEndpoint: "{{ .ControlPlaneEndpoint }}"
 {{- end }}
 # on docker for mac we have to expose the api server via port forward,
 # so we need to ensure the cert is valid for localhost so we can talk
 # to the cluster after rewriting the kubeconfig to point to localhost
 apiServer:
   certSANs: [localhost]
+  {{ if .APIAdvertiseAddress -}}
+  advertiseAddress: "{{ .APIAdvertiseAddress }}"
+  {{- end }}
 controllerManager:
   extraArgs:
     enable-hostpath-provisioner: "true"
+    # configure ipv6 default addresses for IPv6 clusters
+    {{ if .IPv6 -}}
+    bind-address: "::"
+    {{- end }}
+scheduler:
+  extraArgs:
+    # configure ipv6 default addresses for IPv6 clusters
+    {{ if .IPv6 -}}
+    address: "::"
+    bind-address: "::1"
+    {{- end }}
+networking:
+  podSubnet: "{{ .PodSubnet }}"
+  serviceSubnet: "{{ .ServiceSubnet }}"
+
 ---
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: InitConfiguration
@@ -202,6 +263,9 @@ bootstrapTokens:
 # from the host machine such port will be accessible via a random local port instead.
 localAPIEndpoint:
   bindPort: {{.APIBindPort}}
+  {{ if .APIAdvertiseAddress -}}
+  advertiseAddress: "{{ .APIAdvertiseAddress }}"
+  {{- end }}
 ---
 # no-op entry that exists solely so it can be patched
 apiVersion: kubeadm.k8s.io/v1beta1
@@ -213,6 +277,11 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 metadata:
   name: config
+# configure ipv6 addresses in IPv6 mode
+{{ if .IPv6 -}}
+address: "::"
+healthzBindAddress: "::"
+{{- end }}
 # disable disk resource management by default
 # kubelet will see the host disk that the inner container runtime
 # is ultimately backed by and attempt to recover disk space. we don't want that.

@@ -34,10 +34,10 @@ To update these:
 - update the defaultCNIImages array to include the images in the manifest
 - update the comment below with the release URL
 
-Current version: https://github.com/projectcalico/calico/releases/tag/v3.6.0
+Current version: https://github.com/projectcalico/calico/releases/tag/v3.6.1
 */
 
-var defaultCNIImages = []string{"calico/cni:v3.6.0", "calico/node:v3.6.0", "calico/kube-controllers:v3.6.0"}
+var defaultCNIImages = []string{"calico/cni:v3.6.1", "calico/node:v3.6.1", "calico/kube-controllers:v3.6.1", "calico/ctl:v3.6.1"}
 
 const defaultCNIManifest = `# https://docs.projectcalico.org/v3.6/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml
 ---
@@ -62,7 +62,7 @@ data:
   cni_network_config: |-
     {
       "name": "k8s-pod-network",
-      "cniVersion": "0.3.0",
+      "cniVersion": "0.3.1",
       "plugins": [
         {
           "type": "calico",
@@ -71,9 +71,10 @@ data:
           "nodename": "__KUBERNETES_NODE_NAME__",
           "mtu": __CNI_MTU__,
           "ipam": {
-              "type": "calico-ipam",
-              "assign_ipv4": "true",
-              "assign_ipv6": "true"
+              "type": "host-local",
+              "ranges": [
+                [{ "subnet": "usePodCidr" }]
+              ]
           },
           "policy": {
               "type": "k8s"
@@ -542,31 +543,10 @@ spec:
       # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
       terminationGracePeriodSeconds: 0
       initContainers:
-        # This container performs upgrade from host-local IPAM to calico-ipam.
-        # It can be deleted if this is a fresh installation, or if you have already
-        # upgraded to use calico-ipam.
-        - name: upgrade-ipam
-          image: calico/cni:v3.6.0
-          command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
-          env:
-            - name: KUBERNETES_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: CALICO_NETWORKING_BACKEND
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: calico_backend
-          volumeMounts:
-            - mountPath: /var/lib/cni/networks
-              name: host-local-net-dir
-            - mountPath: /host/opt/cni/bin
-              name: cni-bin-dir
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: calico/cni:v3.6.0
+          image: calico/cni:v3.6.1
           command: ["/install-cni.sh"]
           env:
             # Name of the CNI config file to create.
@@ -602,7 +582,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: calico/node:v3.6.0
+          image: calico/node:v3.6.1
           env:
             # Use Kubernetes API as the backing datastore.
             - name: DATASTORE_TYPE
@@ -627,24 +607,22 @@ spec:
             # Auto-detect the BGP IP address.
             - name: IP
               value: "autodetect"
+            - name: IP_AUTODETECTION_METHOD
+              value: interface=eth0
             - name: IP6
               value: "autodetect"
+            - name: IP6_AUTODETECTION_METHOD
+              value: interface=eth0
             # Enable IPIP
             - name: CALICO_IPV4POOL_IPIP
-              value: "Always"
-            # Set MTU for tunnel device used if ipip is enabled
-            - name: FELIX_IPINIPMTU
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: veth_mtu
+              value: "Never"
             # The default IPv4 pool to create on startup if none exists. Pod IPs will be
             # chosen from this range. Changing this value after installation will have
             # no effect. This should fall within --cluster-cidr.
             - name: CALICO_IPV4POOL_CIDR
-              value: "192.168.0.0/16"
+              value: "100.64.0.0/12"
             - name: CALICO_IPV6POOL_CIDR
-              value: "fd80:192:168::/64"
+              value: "fd00:100:64::/64"
             # Disable file logging so _kubectl logs_ works.
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -714,12 +692,6 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
-        # Mount in the directory for host-local IPAM allocations. This is
-        # used when upgrading from host-local to calico-ipam, and can be removed
-        # if not using the upgrade-ipam init container.
-        - name: host-local-net-dir
-          hostPath:
-            path: /var/lib/cni/networks
 ---
 
 apiVersion: v1
@@ -764,7 +736,7 @@ spec:
       serviceAccountName: calico-kube-controllers
       containers:
         - name: calico-kube-controllers
-          image: calico/kube-controllers:v3.6.0
+          image: calico/kube-controllers:v3.6.1
           env:
             # Choose which controllers to run.
             - name: ENABLED_CONTROLLERS
