@@ -467,28 +467,14 @@ func getProxyDetails() proxyDetails {
 	return details
 }
 
-// EnableIPv6 enables IPv6 inside the node container and in the inner docker daemon
-func (n *Node) EnableIPv6() error {
+// EnableDinDIPv6 enables IPv6 in the inner docker daemon
+func (n *Node) EnableDinDIPv6() error {
 	// configure Docker daemon to use ipv6
 	// we take an unused range otherwise the daemon refuse to start
 	err := n.WriteFile("/etc/docker/daemon.json",
 		"{\n\t\"ipv6\": true,\n\t\"fixed-cidr-v6\": \"fc00:db8:1::/64\"\n}")
 	if err != nil {
 		errors.Wrap(err, "failed to create docker daemon.json")
-	}
-
-	// enable ipv6
-	cmd := n.Command("sysctl", "net.ipv6.conf.all.disable_ipv6=0")
-	err = exec.RunLoggingOutputOnFail(cmd)
-	if err != nil {
-		errors.Wrap(err, "failed to enable ipv6")
-	}
-
-	// enable ipv6 forwarding
-	cmd = n.Command("sysctl", "net.ipv6.conf.all.forwarding=1")
-	err = exec.RunLoggingOutputOnFail(cmd)
-	if err != nil {
-		errors.Wrap(err, "failed to enable ipv6 forwarding")
 	}
 
 	return nil

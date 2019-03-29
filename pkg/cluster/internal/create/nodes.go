@@ -154,10 +154,12 @@ func fixupNode(node *nodes.Node, isIPv6 bool) error {
 	}
 
 	if isIPv6 {
-		if err := node.EnableIPv6(); err != nil {
+		// Enable IPv6 in the inner docker daemon
+		if err := node.EnableDinDIPv6(); err != nil {
 			// TODO(bentheelder): logging here
 			return err
 		}
+
 		// Configure the IP that has to be used by the kubelet
 		_, nodeIPv6, err := node.IP()
 		if err != nil {
