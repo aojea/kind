@@ -604,7 +604,16 @@ spec:
             # Cluster type to identify the deployment type
             - name: CLUSTER_TYPE
               value: "k8s,bgp"
-            # Disable IPIP
+            # Auto-detect the BGP IP address.
+            - name: IP
+              value: "autodetect"
+            - name: IP_AUTODETECTION_METHOD
+              value: interface=eth0
+            - name: IP6
+              value: "autodetect"
+            - name: IP6_AUTODETECTION_METHOD
+              value: interface=eth0
+            # Enable IPIP
             - name: CALICO_IPV4POOL_IPIP
               value: "Never"
             # The default IPv4 pool to create on startup if none exists. Pod IPs will be
