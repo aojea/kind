@@ -1,0 +1,129 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.12
+    working_directory: /go/src/sigs.k8s.io/kind
+    steps:
+      - checkout
+#      - run: hack/update-all.sh
+#      - run: hack/verify-all.sh
+      - run: GOOS=linux go build -o workspace/kind
+      - run:
+          name: download dependencies
+          command: |
+            curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+            cp kubectl workspace/kubectl
+            curl -LO https://www.dropbox.com/s/nolkr5qhel7umeh/e2e.test
+            cp e2e.test workspace/e2e.test
+      - persist_to_workspace:
+          root: workspace
+          paths:
+            - kubectl
+            - kind
+            - e2e.test
+
+  e2e_ipv4:
+    machine:
+      enabled: true
+      docker_layer_caching: true
+    working_directory: ~/go/src/sigs.k8s.io/kind
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            chmod +x /tmp/workspace/*
+            sudo cp /tmp/workspace/* /usr/local/bin/
+      - run:
+          name: Create kind node-image
+          command: |
+             kind build node-image --type apt --cni calico
+      - run:
+          name: Create kind cluster
+          command: |
+            kind create cluster --image kindest/node:latest --config test/config-ipv4-ci.yaml --loglevel debug --wait 1m
+            export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
+            kubectl wait -n kube-system --timeout=360s --for condition=Ready -l k8s-app=calico-node pods
+            kubectl get nodes -o wide
+            kubectl get pods --all-namespaces -o wide
+            kubectl get services --all-namespaces -o wide
+      - run:
+          name: Run e2e tests
+          no_output_timeout: 200m
+          command: |
+            e2e.test --provider=local --kubeconfig=$(kind get kubeconfig-path --name="kind") --ginkgo.focus "Networking.Granular" --ginkgo.skip "windows"
+
+  e2e_ipv6:
+    machine:
+      enabled: true
+      docker_layer_caching: true
+    working_directory: ~/go/src/sigs.k8s.io/kind
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - checkout
+      - run:
+          name: enable ipv6
+          command: |
+            cat <<'EOF' | sudo tee /etc/docker/daemon.json
+            {
+              "ipv6": true,
+              "fixed-cidr-v6": "2001:db8:1::/64"
+            }
+            EOF
+            sudo service docker restart
+      - run:
+          name: Add fake external IPv6 address
+          command: |
+            sudo ip -6 addr add 2001:4860:4860::8888 dev docker0
+      - run:
+          name: Install dependencies
+          command: |
+            chmod +x /tmp/workspace/*
+            sudo cp /tmp/workspace/* /usr/local/bin/
+      - run:
+          name: Create kind node-image
+          command: |
+             kind build node-image --type apt --cni calico-ipv6
+      - run:
+          name: Create kind cluster
+          command: |
+            kind create cluster --image kindest/node:latest --config test/config-ipv6-ci.yaml --loglevel debug --wait 1m
+            export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
+            kubectl wait -n kube-system --timeout=320s --for condition=Ready -l k8s-app=calico-node pods
+            kubectl get nodes -o wide
+            kubectl get pods --all-namespaces -o wide
+            kubectl get services --all-namespaces -o wide
+      - run:
+          name: Run e2e tests
+          no_output_timeout: 200m
+          command: |
+            export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
+            # Fake google.com
+            kubectl apply -f test/fake-google-com.yaml
+            kubectl wait --timeout=60s --for condition=Ready -l run=my-google pods
+            kubectl wait -n kube-system --for=condition=Ready -l k8s-app=kube-dns pods
+            # Run e2e tests
+            e2e.test --provider=local --kubeconfig=$(kind get kubeconfig-path --name="kind") --ginkgo.focus "Networking.Granular" --ginkgo.skip "windows"
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build
+      - e2e_ipv4:
+          requires:
+            - build
+          filters:
+            branches:
+              only: /circle.*/
+      - e2e_ipv6:
+          requires:
+            - build
+          filters:
+            branches:
+              only: /circle.*/
+
