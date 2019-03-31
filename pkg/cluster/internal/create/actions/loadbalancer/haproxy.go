@@ -74,10 +74,10 @@ func (a *Action) Execute(ctx *actions.ActionContext) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to get IP for node %s", n.Name())
 		}
-		if controlPlaneIPv4 != "" && ctx.Config.Networking.IpFamily == "ipv4" {
+		if controlPlaneIPv4 != "" && ctx.Config.Networking.IPFamily == "ipv4" {
 			backendServers[n.Name()] = fmt.Sprintf("%s:%d", controlPlaneIPv4, kubeadm.APIServerPort)
 		}
-		if controlPlaneIPv6 != "" && ctx.Config.Networking.IpFamily == "ipv6" {
+		if controlPlaneIPv6 != "" && ctx.Config.Networking.IPFamily == "ipv6" {
 			backendServers[n.Name()] = fmt.Sprintf("%s:%d", controlPlaneIPv6, kubeadm.APIServerPort)
 		}
 	}

@@ -273,7 +273,7 @@ func getJoinAddress(ctx *actions.ActionContext, allNodes []nodes.Node) (string, 
 		return "", err
 	}
 
-	if ctx.Config.Networking.IpFamily == "ipv6" {
+	if ctx.Config.Networking.IPFamily == "ipv6" {
 		controlPlaneEndpoint = controlPlaneEndpointIPv6
 	}
 
@@ -294,7 +294,7 @@ func getJoinAddress(ctx *actions.ActionContext, allNodes []nodes.Node) (string, 
 		return "", errors.Wrap(err, "failed to get IP for node")
 	}
 
-	if ctx.Config.Networking.IpFamily == "ipv6" {
+	if ctx.Config.Networking.IPFamily == "ipv6" {
 		controlPlane = fmt.Sprintf("[%s]", controlPlaneIPv6)
 	}
 

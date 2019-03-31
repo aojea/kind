@@ -111,7 +111,7 @@ func createNodeContainers(
 				errChan <- err
 				return
 			}
-			err = fixupNode(node, cfg.Networking.IpFamily == "ipv6")
+			err = fixupNode(node, cfg.Networking.IPFamily == "ipv6")
 			if err != nil {
 				errChan <- err
 				return

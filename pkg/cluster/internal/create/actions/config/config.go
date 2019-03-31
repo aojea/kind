@@ -75,7 +75,7 @@ func (a *Action) Execute(ctx *actions.ActionContext) error {
 	}
 
 	// configure the right protocol addresses
-	if ctx.Config.Networking.IpFamily == "ipv6" {
+	if ctx.Config.Networking.IPFamily == "ipv6" {
 		apiAdvertiseAddress = apiAdvertiseAddressIPv6
 		controlPlaneEndpoint = controlPlaneEndpointIPv6
 	}
@@ -89,7 +89,7 @@ func (a *Action) Execute(ctx *actions.ActionContext) error {
 			ControlPlaneEndpoint: controlPlaneEndpoint,
 			APIBindPort:          kubeadm.APIServerPort,
 			Token:                kubeadm.Token,
-			IPv6:                 ctx.Config.Networking.IpFamily == "ipv6",
+			IPv6:                 ctx.Config.Networking.IPFamily == "ipv6",
 			APIAdvertiseAddress:  apiAdvertiseAddress,
 		},
 	)
