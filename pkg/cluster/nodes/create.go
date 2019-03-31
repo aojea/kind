@@ -135,10 +135,6 @@ func createNode(name, image, clusterLabel, role string, mounts []cri.Mount, extr
 		"--tmpfs", "/run", // systemd wants a writable /run
 		// some k8s things want /lib/modules
 		"-v", "/lib/modules:/lib/modules:ro",
-		// current calico config needs ipv6 enable
-		// run the node as dual stack to support all scenarios
-		"--sysctl", "net.ipv6.conf.all.disable_ipv6=0",
-		"--sysctl", "net.ipv6.conf.all.forwarding=1",
 		"--hostname", name, // make hostname match container name
 		"--name", name, // ... and set the container name
 		// label the node with the cluster ID
