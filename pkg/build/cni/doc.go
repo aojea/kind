@@ -14,11 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
-
-// these are well known paths within the node image
-const (
-	// TODO: refactor kubernetesVersionLocation to a common internal package
-	kubernetesVersionLocation  = "/kind/version"
-	defaultCNIManifestLocation = "/kind/manifests/default-cni.yaml"
-)
+// Package build implements functionality to build the kind images
+package cni

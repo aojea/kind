@@ -29,6 +29,7 @@ type flagpole struct {
 	Image     string
 	BaseImage string
 	KubeRoot  string
+	Cni       string
 }
 
 // NewCommand returns a new cobra.Command for building the node image
@@ -63,6 +64,11 @@ func NewCommand() *cobra.Command {
 		node.DefaultBaseImage,
 		"name:tag of the base image to use for the build",
 	)
+	cmd.Flags().StringVar(
+		&flags.Cni, "cni",
+		node.DefaultCNI,
+		"CNI plugin used for the cluster networking",
+	)
 	return cmd
 }
 
@@ -73,6 +79,7 @@ func runE(flags *flagpole, cmd *cobra.Command, args []string) error {
 		node.WithImage(flags.Image),
 		node.WithBaseImage(flags.BaseImage),
 		node.WithKuberoot(flags.KubeRoot),
+		node.WithCni(flags.Cni),
 	)
 	if err != nil {
 		return errors.Wrap(err, "error creating build context")

@@ -14,11 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+// Package sources contains the baked in sources kind needs to install the CNI plugin.
+// Primarily this includes the CNI plugin installation manifest
+package sources
 
-// these are well known paths within the node image
-const (
-	// TODO: refactor kubernetesVersionLocation to a common internal package
-	kubernetesVersionLocation  = "/kind/version"
-	defaultCNIManifestLocation = "/kind/manifests/default-cni.yaml"
-)
+// We pull in the sources with go-bindata
+//go:generate go-bindata -nometadata -mode=0666 -pkg=$GOPACKAGE -o=cni_sources.go -ignore=(\.*README\.md)|(\.*BUILD\.bazel) -prefix=./../../../../ ./../../../../cniplugins/...

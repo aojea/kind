@@ -34,6 +34,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"sigs.k8s.io/kind/pkg/build/cni"
 	"sigs.k8s.io/kind/pkg/build/kube"
 	"sigs.k8s.io/kind/pkg/container/docker"
 	"sigs.k8s.io/kind/pkg/exec"
@@ -42,6 +43,9 @@ import (
 
 // DefaultImage is the default name:tag for the built image
 const DefaultImage = "kindest/node:latest"
+
+// DefaultCNI is the default CNI plugin for the cluster networking
+const DefaultCNI = "weave"
 
 // DefaultBaseImage is the default base image used
 const DefaultBaseImage = "kindest/base:v20190320-962dc1b"
@@ -81,6 +85,13 @@ func WithKuberoot(root string) Option {
 	}
 }
 
+// WithCni sets the CNI plugin to be used for the cluster networking
+func WithCni(cni string) Option {
+	return func(b *BuildContext) {
+		b.cni = cni
+	}
+}
+
 // BuildContext is used to build the kind node image, and contains
 // build configuration
 type BuildContext struct {
@@ -88,10 +99,12 @@ type BuildContext struct {
 	mode      string
 	image     string
 	baseImage string
+	cni       string
 	// non-option fields
-	arch     string // TODO(bentheelder): this should be an option
-	kubeRoot string
-	bits     kube.Bits
+	arch      string // TODO(bentheelder): this should be an option
+	kubeRoot  string
+	bits      kube.Bits
+	cniPlugin cni.Plugin
 }
 
 // NewBuildContext creates a new BuildContext with default configuration,
@@ -102,6 +115,7 @@ func NewBuildContext(options ...Option) (ctx *BuildContext, err error) {
 		mode:      DefaultMode,
 		image:     DefaultImage,
 		baseImage: DefaultBaseImage,
+		cni:       DefaultCNI,
 		arch:      util.GetArch(),
 	}
 	// apply user options
@@ -126,6 +140,12 @@ func NewBuildContext(options ...Option) (ctx *BuildContext, err error) {
 		return nil, err
 	}
 	ctx.bits = bits
+	// select the CNI plugin
+	cniPlugin, err := cni.GetPlugin(ctx.cni)
+	if err != nil {
+		return nil, err
+	}
+	ctx.cniPlugin = cniPlugin
 	return ctx, nil
 }
 
@@ -198,6 +218,9 @@ func (c *BuildContext) getBuiltImages() (sets.String, error) {
 
 // BuildContainerLabelKey is applied to each build container
 const BuildContainerLabelKey = "io.k8s.sigs.kind.build"
+
+// CniContainerLabelKey is applied to each container with the CNI capabilities as value
+const CniContainerLabelKey = "io.k8s.sigs.kind.cni"
 
 // DockerImageArchives is the path within the node image where image archives
 // will be stored.
@@ -364,7 +387,6 @@ func (c *BuildContext) prePullImages(dir, containerID string) error {
 		}
 	}
 
-	// write the default CNI manifest
 	// NOTE: the paths inside the container should use the path package
 	// and not filepath (!), we want posixy paths in the linux container, NOT
 	// whatever path format the host uses. For paths on the host we use filepath
@@ -377,7 +399,7 @@ func (c *BuildContext) prePullImages(dir, containerID string) error {
 	if err := cmder.Command(
 		"cp", "/dev/stdin", defaultCNIManifestLocation,
 	).SetStdin(
-		strings.NewReader(defaultCNIManifest),
+		strings.NewReader(c.cniPlugin.Manifest),
 	).Run(); err != nil {
 		log.Errorf("Image build Failed! Failed write default CNI Manifest: %v", err)
 		return err
@@ -392,7 +414,7 @@ func (c *BuildContext) prePullImages(dir, containerID string) error {
 	}
 
 	// all builds should isntall the default CNI images currently
-	requiredImages = append(requiredImages, defaultCNIImages...)
+	requiredImages = append(requiredImages, c.cniPlugin.Images...)
 
 	// Create "images" subdir.
 	imagesDir := path.Join(dir, "bits", "images")
@@ -447,8 +469,9 @@ func (c *BuildContext) createBuildContainer(buildDir string) (id string, err err
 		c.baseImage,
 		docker.WithRunArgs(
 			"-d", // make the client exit while the container continues to run
-			// label the container to make them easier to track
+			// label the container to make them easier to track and to know their capabilities
 			"--label", fmt.Sprintf("%s=%s", BuildContainerLabelKey, time.Now().Format(time.RFC3339Nano)),
+			"--label", fmt.Sprintf("%s=%s", CniContainerLabelKey, c.cniPlugin.Capabilities),
 			"-v", fmt.Sprintf("%s:/build", buildDir),
 			// the container should hang forever so we can exec in it
 			"--entrypoint=sleep",
