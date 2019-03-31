@@ -475,6 +475,7 @@ func (n *Node) EnableIPv6() error {
 		"{\n\t\"ipv6\": true,\n\t\"fixed-cidr-v6\": \"fc00:db8:1::/64\"\n}")
 	if err != nil {
 		errors.Wrap(err, "failed to create docker daemon.json")
+		return err
 	}
 
 	// enable ipv6
@@ -482,6 +483,7 @@ func (n *Node) EnableIPv6() error {
 	err = exec.RunLoggingOutputOnFail(cmd)
 	if err != nil {
 		errors.Wrap(err, "failed to enable ipv6")
+		return err
 	}
 
 	// enable ipv6 forwarding
@@ -489,6 +491,7 @@ func (n *Node) EnableIPv6() error {
 	err = exec.RunLoggingOutputOnFail(cmd)
 	if err != nil {
 		errors.Wrap(err, "failed to enable ipv6 forwarding")
+		return err
 	}
 
 	return nil
