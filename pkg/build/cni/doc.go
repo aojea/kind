@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package build implements functionality to build the kind images
+// Package cni implements functionality to install different CNI plugins in the kind images
 package cni
