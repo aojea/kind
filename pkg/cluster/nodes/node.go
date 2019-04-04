@@ -18,6 +18,7 @@ package nodes
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -447,17 +448,39 @@ func getProxyDetails() proxyDetails {
 	return details
 }
 
+// DockerDaemonConfig contains the docker daemon options supported by kind
+// Obtained from github.com/docker/docker/daemon/config
+type DockerDaemonConfig struct {
+	EnableIPv6         bool     `json:"ipv6,omitempty"`
+	FixedCIDRv6        string   `json:"fixed-cidr-v6,omitempty"`
+	InsecureRegistries []string `json:"insecure-registries,omitempty"`
+	CriContainerd      bool     `json:"cri-containerd,omitempty"`
+	GraphDriver        string   `json:"storage-driver,omitempty"`
+}
+
 // EnableIPv6 enables IPv6 inside the node container and in the inner docker daemon
 func (n *Node) EnableIPv6() error {
 	// configure Docker daemon to use ipv6
-	// we take an unused range otherwise the daemon refuse to start
-	// TODO(aojea): Be smarter modifying the daemon.json file
-	err := n.WriteFile("/etc/docker/daemon.json",
-		"{\n\t\"ipv6\": true,\n\t\"fixed-cidr-v6\": \"fc00:db8:1::/64\"\n}")
+	// read the daemon config file
+	var daemonConfig DockerDaemonConfig
+	var out bytes.Buffer
+	// read docker daemon from config if exist
+	_ = n.Command("cat", "/etc/docker/daemon.json").SetStdout(&out).Run()
+	// unmarshal our byteArray which contains our docker daemon config
+	json.Unmarshal(out.Bytes(), &daemonConfig)
+	// enable IPv6 and configure and IPv6 subnet
+	daemonConfig.EnableIPv6 = true
+	daemonConfig.FixedCIDRv6 = "fc00:a:b:c:d::/112"
+	// create a new Json with the new config
+	daemonJson, err := json.MarshalIndent(&daemonConfig, "", " ")
 	if err != nil {
-		return errors.Wrap(err, "failed to create docker daemon.json")
+		return errors.Wrap(err, "failed to create docker json config")
 	}
-
+	// write the new docker config with IPv6 enable
+	err = n.WriteFile("/etc/docker/daemon.json", string(daemonJson))
+	if err != nil {
+		return errors.Wrap(err, "failed to create docker file daemon.json")
+	}
 	// enable ipv6
 	cmd := n.Command("sysctl", "net.ipv6.conf.all.disable_ipv6=0")
 	err = exec.RunLoggingOutputOnFail(cmd)
