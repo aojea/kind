@@ -212,6 +212,7 @@ To specify a configuration file when creating a cluster, use the `--config`
 flag.
 For a sample kind configuration file see [kind-example-config][kind-example-config].
 
+#### Multi-node clusters
 In particular, many users may be interested in multi-node clusters. A simple
 configuration for this can be achieved with the following config file contents:
 ```yaml
@@ -224,6 +225,7 @@ nodes:
 - role: worker
 ```
 
+#### Control-plane HA
 You can also have a cluster with multiple control-plane nodes:
 ```yaml
 # a cluster with 3 control-plane nodes and 3 workers
@@ -234,6 +236,23 @@ nodes:
 - role: control-plane
 - role: control-plane
 - role: worker
+- role: worker
+- role: worker
+```
+
+#### IPv6 clusters
+You can run ipv6 only clusters using `kind`, but first you need to
+[enable ipv6 in your docker daemon][docker enable ipv6].
+
+```yaml
+# an ipv6 cluster
+kind: Cluster
+apiVersion: kind.sigs.k8s.io/v1alpha3
+networking:
+  ipFamily: ipv6
+nodes:
+# the control plane node
+- role: control-plane
 - role: worker
 - role: worker
 ```
@@ -299,3 +318,4 @@ kind, the Kubernetes cluster itself, etc.
 [CGO]: https://golang.org/cmd/cgo/
 [Kubernetes imagePullPolicy]: https://kubernetes.io/docs/concepts/containers/images/#updating-images
 [Private Registries]: /docs/user/private-registries
+[docker enable ipv6]: https://docs.docker.com/config/daemon/ipv6/
