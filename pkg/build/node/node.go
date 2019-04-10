@@ -364,7 +364,7 @@ func (c *BuildContext) prePullImages(dir, containerID string) error {
 		}
 	}
 
-	// write the default CNI manifest
+	// write the default CNI manifests
 	// NOTE: the paths inside the container should use the path package
 	// and not filepath (!), we want posixy paths in the linux container, NOT
 	// whatever path format the host uses. For paths on the host we use filepath
@@ -374,15 +374,21 @@ func (c *BuildContext) prePullImages(dir, containerID string) error {
 		log.Errorf("Image build Failed! Failed write default CNI Manifest: %v", err)
 		return err
 	}
-	if err := cmder.Command(
-		"cp", "/dev/stdin", defaultCNIManifestLocation,
-	).SetStdin(
-		strings.NewReader(defaultCNIManifest),
-	).Run(); err != nil {
-		log.Errorf("Image build Failed! Failed write default CNI Manifest: %v", err)
-		return err
+	for location, manifest := range defaultCNIManifests {
+		data, err := Asset(manifest)
+		if err != nil {
+			log.Errorf("Image build Failed! Failed to get  CNI Manifest: %v", err)
+			return err
+		}
+		if err := cmder.Command(
+			"cp", "/dev/stdin", location,
+		).SetStdin(
+			strings.NewReader(string(data)),
+		).Run(); err != nil {
+			log.Errorf("Image build Failed! Failed write default CNI Manifest: %v", err)
+			return err
+		}
 	}
-
 	// gets the list of images required by kubeadm
 	requiredImages, err := exec.CombinedOutputLines(cmder.Command(
 		"kubeadm", "config", "images", "list", "--kubernetes-version", rawVersion[0],

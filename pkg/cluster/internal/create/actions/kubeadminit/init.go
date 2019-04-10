@@ -96,8 +96,12 @@ func (a *action) Execute(ctx *actions.ActionContext) error {
 	// TODO(bentheelder): this should possibly be a different action?
 	// TODO(bentheelder): support other overlay networks
 	// first probe for a pre-installed manifest
+	defaultCNIManifest := "/kind/manifests/default-cni.yaml"
+	if ctx.Config.Networking.IPFamily == "ipv6" {
+		defaultCNIManifest = "/kind/manifests/default-cni-ipv6.yaml"
+	}
 	haveDefaultCNIManifest := true
-	if err := node.Command("test", "-f", "/kind/manifests/default-cni.yaml").Run(); err != nil {
+	if err := node.Command("test", "-f", defaultCNIManifest).Run(); err != nil {
 		haveDefaultCNIManifest = false
 	}
 	if haveDefaultCNIManifest {
@@ -105,7 +109,7 @@ func (a *action) Execute(ctx *actions.ActionContext) error {
 		// the images should already be loaded along with kubernetes
 		if err := node.Command(
 			"kubectl", "create", "--kubeconfig=/etc/kubernetes/admin.conf",
-			"-f", "/kind/manifests/default-cni.yaml",
+			"-f", defaultCNIManifest,
 		).Run(); err != nil {
 			return errors.Wrap(err, "failed to apply overlay network")
 		}
