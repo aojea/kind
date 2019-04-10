@@ -472,12 +472,12 @@ func (n *Node) EnableIPv6() error {
 	daemonConfig.EnableIPv6 = true
 	daemonConfig.FixedCIDRv6 = "fc00:a:b:c:d::/112"
 	// create a new Json with the new config
-	daemonJson, err := json.MarshalIndent(&daemonConfig, "", " ")
+	daemonJSON, err := json.MarshalIndent(&daemonConfig, "", " ")
 	if err != nil {
 		return errors.Wrap(err, "failed to create docker json config")
 	}
 	// write the new docker config with IPv6 enable
-	err = n.WriteFile("/etc/docker/daemon.json", string(daemonJson))
+	err = n.WriteFile("/etc/docker/daemon.json", string(daemonJSON))
 	if err != nil {
 		return errors.Wrap(err, "failed to create docker file daemon.json")
 	}
