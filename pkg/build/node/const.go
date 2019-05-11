@@ -139,11 +139,12 @@ data:
       "plugins": [
         {
           "type": "bridge",
-          "ipMasq": true,
+          "ipMasq": false,
           "isDefaultGateway": true,
           "hairpinMode": true,
           "ipam": {
             "type": "host-local",
+            "dataDir": "/run/cni-ipam-state",
             "routes": [
               {"dst": "0.0.0.0/0"},
               {"dst": "::/0"}
