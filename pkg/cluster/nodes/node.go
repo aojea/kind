@@ -284,27 +284,28 @@ func getProxyDetails() proxyDetails {
 
 // EnableIPv6 enables IPv6 inside the node container and in the inner docker daemon
 func (n *Node) EnableIPv6() error {
-	// configure Docker daemon to use ipv6
-	// we take an unused range otherwise the daemon refuse to start
-	// TODO(aojea): Be smarter modifying the daemon.json file
-	err := n.WriteFile("/etc/docker/daemon.json",
-		"{\n\t\"ipv6\": true,\n\t\"fixed-cidr-v6\": \"fc00:db8:1::/64\"\n}")
-	if err != nil {
-		return errors.Wrap(err, "failed to create docker daemon.json")
-	}
-
 	// enable ipv6
 	cmd := n.Command("sysctl", "net.ipv6.conf.all.disable_ipv6=0")
-	err = exec.RunLoggingOutputOnFail(cmd)
+	err := exec.RunLoggingOutputOnFail(cmd)
 	if err != nil {
 		return errors.Wrap(err, "failed to enable ipv6")
 	}
-
 	// enable ipv6 forwarding
 	cmd = n.Command("sysctl", "net.ipv6.conf.all.forwarding=1")
 	err = exec.RunLoggingOutputOnFail(cmd)
 	if err != nil {
 		return errors.Wrap(err, "failed to enable ipv6 forwarding")
+	}
+	// enable ipv6 kubelet
+	_, nodeIPv6, err := n.IP()
+	if err != nil {
+		return errors.Wrap(err, "failed to get IP for node")
+	}
+
+	kubeletExtraConfig := fmt.Sprintf("KUBELET_EXTRA_ARGS=\"--fail-swap-on=false --node-ip=%s\"", nodeIPv6)
+	if err := n.WriteFile("/etc/default/kubelet", kubeletExtraConfig); err != nil {
+		// TODO(bentheelder): logging here
+		return errors.Wrap(err, "failed to copy kubelet extra config to node")
 	}
 
 	return nil
