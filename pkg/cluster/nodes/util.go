@@ -35,21 +35,10 @@ func GetControlPlaneEndpoint(allNodes []Node) (string, string, error) {
 	if node == nil {
 		return "", "", nil
 	}
-<<<<<<< HEAD
-
-	// get the IP and port for the load balancer
-	loadBalancerIP, err := node.IP()
-=======
 	// gets the IP of the load balancer
 	loadBalancerIPv4, loadBalancerIPv6, err := node.IP()
->>>>>>> 3f8f3e1... Add IPv6 support
 	if err != nil {
 		return "", "", errors.Wrapf(err, "failed to get IPs for node: %s", node.Name())
 	}
-<<<<<<< HEAD
-
-	return fmt.Sprintf("%s:%d", loadBalancerIP, loadbalancer.ControlPlanePort), nil
-=======
-	return fmt.Sprintf("%s:%d", loadBalancerIPv4, haproxy.ControlPlanePort), fmt.Sprintf("[%s]:%d", loadBalancerIPv6, haproxy.ControlPlanePort), nil
->>>>>>> 3f8f3e1... Add IPv6 support
+	return fmt.Sprintf("%s:%d", loadBalancerIPv4, loadbalancer.ControlPlanePort), fmt.Sprintf("[%s]:%d", loadBalancerIPv6, loadbalancer.ControlPlanePort), nil
 }
