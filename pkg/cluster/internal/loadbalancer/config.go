@@ -41,7 +41,7 @@ stream {
     }
 
     server {
-        listen {{ .ControlPlanePort }};
+        listen [::]:{{ .ControlPlanePort }};
         proxy_pass tcp_backend;
     }
 }
