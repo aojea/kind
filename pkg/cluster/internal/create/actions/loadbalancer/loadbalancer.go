@@ -83,10 +83,13 @@ func (a *Action) Execute(ctx *actions.ActionContext) error {
 		}
 	}
 
+	ipv6 := ctx.Config.Networking.IPFamily == "ipv6"
+
 	// create loadbalancer config data
 	loadbalancerConfig, err := loadbalancer.Config(&loadbalancer.ConfigData{
 		ControlPlanePort: loadbalancer.ControlPlanePort,
 		BackendServers:   backendServers,
+		IPv6:             ipv6,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to generate loadbalancer config data")
