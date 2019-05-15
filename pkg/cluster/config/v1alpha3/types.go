@@ -88,6 +88,8 @@ const (
 
 // Networking contains cluster wide network settings
 type Networking struct {
+	// IPFamily is the network cluster model, it can be ipv4, ipv6 or dual-stack
+	IPFamily ClusterIPFamily `json:"ipFamily,omitempty"`
 	// APIServerPort is the listen port on the host for the Kubernetes API Server
 	// Defaults to a random port on the host
 	APIServerPort int32 `json:"apiServerPort,omitempty"`
@@ -99,7 +101,22 @@ type Networking struct {
 	// PodSubnet is the CIDR used for pod IPs
 	// kind will select a default if unspecified
 	PodSubnet string `json:"podSubnet,omitempty"`
+	// ServiceSubnet is the CIDR used for services VIPs
+	// kind will select a default if unspecified for IPv6
+	ServiceSubnet string `json:"serviceSubnet,omitempty"`
 	// If DisableDefaultCNI is true, kind will not install the default CNI setup.
 	// Instead the user should install their own CNI after creating the cluster.
 	DisableDefaultCNI bool `json:"disableDefaultCNI,omitempty"`
 }
+
+// ClusterIPFamily defines cluster network IP family
+type ClusterIPFamily string
+
+const (
+	// IPv4Family sets ClusterIPFamily to ipv4
+	IPv4Family ClusterIPFamily = "ipv4"
+	// IPv6Family sets ClusterIPFamily to ipv6
+	IPv6Family ClusterIPFamily = "ipv6"
+	// DualStackFamily sets ClusterIPFamily to ipv4 and ipv6
+	DualStackFamily ClusterIPFamily = "ipv4-ipv6"
+)

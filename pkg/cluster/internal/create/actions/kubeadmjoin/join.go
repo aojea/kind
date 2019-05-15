@@ -253,16 +253,20 @@ func runKubeadmJoin(
 	return nil
 }
 
-// getJoinAddress return the join address thas is the control plane endpoint in case the cluster has
+// getJoinAddress return the join addresses is the control plane endpoint in case the cluster has
 // an external load balancer in front of the control-plane nodes, otherwise the address of the
 // boostrap control plane node.
 func getJoinAddress(ctx *actions.ActionContext, allNodes []nodes.Node) (string, error) {
 	// get the control plane endpoint, in case the cluster has an external load balancer in
 	// front of the control-plane nodes
-	controlPlaneEndpoint, err := nodes.GetControlPlaneEndpoint(allNodes)
+	controlPlaneEndpoint, controlPlaneEndpointIPv6, err := nodes.GetControlPlaneEndpoint(allNodes)
 	if err != nil {
 		// TODO(bentheelder): logging here
 		return "", err
+	}
+
+	if ctx.Config.Networking.IPFamily == "ipv6" {
+		controlPlaneEndpoint = controlPlaneEndpointIPv6
 	}
 
 	// if the control plane endpoint is defined we are using it as a join address
@@ -277,10 +281,14 @@ func getJoinAddress(ctx *actions.ActionContext, allNodes []nodes.Node) (string, 
 	}
 
 	// get the IP of the bootstrap control plane node
-	controlPlaneIP, err := controlPlaneHandle.IP()
+	controlPlane, controlPlaneIPv6, err := controlPlaneHandle.IP()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get IP for node")
 	}
 
-	return fmt.Sprintf("%s:%d", controlPlaneIP, kubeadm.APIServerPort), nil
+	if ctx.Config.Networking.IPFamily == "ipv6" {
+		controlPlane = fmt.Sprintf("[%s]", controlPlaneIPv6)
+	}
+
+	return fmt.Sprintf("%s:%d", controlPlane, kubeadm.APIServerPort), nil
 }
