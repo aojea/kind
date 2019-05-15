@@ -45,10 +45,12 @@ func SetDefaults_Cluster(obj *Cluster) {
 		obj.Networking.IPFamily = "ipv4"
 	}
 	// default to listening on 127.0.0.1:randomPort on ipv4
-	// docker has limitations to expose ports on IPv6 addresses
-	// TODO(bentheelder): restrict default for ipv6 clusters
-	if obj.Networking.APIServerAddress == "" && obj.Networking.IPFamily == "ipv4" {
+	// and [::1]:randomPort on ipv6
+	if obj.Networking.APIServerAddress == "" {
 		obj.Networking.APIServerAddress = "127.0.0.1"
+		if obj.Networking.IPFamily == "ipv6" {
+			obj.Networking.APIServerAddress = "::1"
+		}
 	}
 	// default the pod CIDR
 	if obj.Networking.PodSubnet == "" {
