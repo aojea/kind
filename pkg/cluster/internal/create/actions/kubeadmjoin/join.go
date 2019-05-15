@@ -187,6 +187,17 @@ func runKubeadmJoinControlPlane(
 		}
 	}
 
+	// get the address the API Server will advertise to other members of the cluster
+	apiAdvertiseAddress, apiAdvertiseAddressIPv6, err := node.IP()
+	if err != nil {
+		return errors.Wrap(err, "failed to get IP to advertise for the control node")
+	}
+
+	// configure the right protocol addresses
+	if ctx.Config.Networking.IPFamily == "ipv6" {
+		apiAdvertiseAddress = apiAdvertiseAddressIPv6
+	}
+
 	// run kubeadm join --control-plane
 	cmd := node.Command(
 		"kubeadm", "join",
@@ -204,6 +215,8 @@ func runKubeadmJoinControlPlane(
 		// increase verbosity for debug
 		"--v=6",
 		"--cri-socket=/run/containerd/containerd.sock",
+		// If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on
+		"--apiserver-advertise-address", apiAdvertiseAddress,
 	)
 	lines, err := exec.CombinedOutputLines(cmd)
 	log.Debug(strings.Join(lines, "\n"))
