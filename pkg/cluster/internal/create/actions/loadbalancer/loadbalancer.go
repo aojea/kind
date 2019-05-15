@@ -79,7 +79,7 @@ func (a *Action) Execute(ctx *actions.ActionContext) error {
 			backendServers[n.Name()] = fmt.Sprintf("%s:%d", controlPlaneIPv4, kubeadm.APIServerPort)
 		}
 		if controlPlaneIPv6 != "" && ctx.Config.Networking.IPFamily == "ipv6" {
-			backendServers[n.Name()] = fmt.Sprintf("%s:%d", controlPlaneIPv6, kubeadm.APIServerPort)
+			backendServers[n.Name()] = fmt.Sprintf("[%s]:%d", controlPlaneIPv6, kubeadm.APIServerPort)
 		}
 	}
 
