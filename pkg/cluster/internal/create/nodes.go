@@ -162,7 +162,7 @@ func nodesToCreate(cfg *config.Cluster, clusterName string) []nodeSpec {
 		}
 	}
 	isHA := controlPlanes > 1
-	ipv6 := "ipv6" == cfg.Networking.IPFamily
+	ipv6 := cfg.Networking.IPFamily == "ipv6"
 
 	// add all of the config nodes as desired nodes
 	for _, configNode := range configNodes {
