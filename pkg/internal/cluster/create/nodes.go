@@ -165,7 +165,7 @@ func nodesToCreate(cfg *config.Cluster, clusterName string) []nodeSpec {
 	isHA := controlPlanes > 1
 	// obtain IP family
 	ipv6 := false
-	if cfg.Networking.IPFamily == "ipv6" {
+	if cfg.Networking.IPFamily == "ipv6" || cfg.Networking.IPFamily == "DualStack" {
 		ipv6 = true
 	}
 
