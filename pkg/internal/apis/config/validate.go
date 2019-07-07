@@ -17,8 +17,9 @@ limitations under the License.
 package config
 
 import (
-	"net"
+	"strings"
 
+	utilnet "k8s.io/utils/net"
 	"sigs.k8s.io/kind/pkg/errors"
 )
 
@@ -36,13 +37,15 @@ func (c *Cluster) Validate() error {
 		}
 	}
 
+	isDualStack := c.Networking.IPFamily == "DualStack"
 	// podSubnet should be a valid CIDR
-	if _, _, err := net.ParseCIDR(c.Networking.PodSubnet); err != nil {
-		errs = append(errs, errors.Wrapf(err, "invalid podSubnet"))
+	if err := validateSubnets(c.Networking.PodSubnet, isDualStack); err != nil {
+		errs = append(errs, errors.Errorf("invalid pod subnet %v", err))
 	}
+
 	// serviceSubnet should be a valid CIDR
-	if _, _, err := net.ParseCIDR(c.Networking.ServiceSubnet); err != nil {
-		errs = append(errs, errors.Wrapf(err, "invalid serviceSubnet"))
+	if err := validateSubnets(c.Networking.ServiceSubnet, isDualStack); err != nil {
+		errs = append(errs, errors.Errorf("invalid service subnet %v", err))
 	}
 
 	// validate nodes
@@ -113,6 +116,35 @@ func validatePort(port int32) error {
 	// backend where possible as opposed to in kind itself.
 	if port < -1 || port > 65535 {
 		return errors.Errorf("invalid port number: %d", port)
+	}
+	return nil
+}
+
+func validateSubnets(subnetStr string, dualstack bool) error {
+	allErrs := []error{}
+	subnets, err := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	if err != nil {
+		return err
+	}
+	switch {
+	// if DualStack only 2 CIDRs allowed
+	case dualstack && len(subnets) > 2:
+		allErrs = append(allErrs, errors.New("expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
+	// if DualStack and there are 2 CIDRs validate if there is at least one of each IP family
+	case dualstack && len(subnets) == 2:
+		areDualStackCIDRs, err := utilnet.IsDualStackCIDRs(subnets)
+		if err != nil {
+			allErrs = append(allErrs, err)
+		} else if !areDualStackCIDRs {
+			allErrs = append(allErrs, errors.New("expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
+		}
+	// if not DualStack only one CIDR allowed
+	case !dualstack && len(subnets) > 1:
+		allErrs = append(allErrs, errors.New("only one CIDR allowed for single-stack networking"))
+	}
+
+	if len(allErrs) > 0 {
+		return errors.NewAggregate(allErrs)
 	}
 	return nil
 }
