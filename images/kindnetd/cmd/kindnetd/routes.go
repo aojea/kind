@@ -24,28 +24,35 @@ import (
 	"github.com/vishvananda/netlink/nl"
 )
 
-func syncRoute(nodeIP, podCIDR string) error {
-	// parse subnet
-	dst, err := netlink.ParseIPNet(podCIDR)
-	if err != nil {
-		return err
-	}
-
-	// Check if the route exists to the other node's PodCIDR
+func syncRoute(nodeIP string, podCIDRs []string) error {
 	ip := net.ParseIP(nodeIP)
-	routeToDst := netlink.Route{Dst: dst, Gw: ip}
-	route, err := netlink.RouteListFiltered(nl.GetIPFamily(ip), &routeToDst, netlink.RT_FILTER_DST)
-	if err != nil {
-		return err
+	// return if is not a global unicast address
+	// we can't use to route our traffic
+	if !ip.IsGlobalUnicast() {
+		// TODO fail and handle the error
+		return nil
 	}
-
-	// Add route if not present
-	if len(route) == 0 {
-		if err := netlink.RouteAdd(&routeToDst); err != nil {
+	for _, podCIDR := range podCIDRs {
+		// parse subnet
+		dst, err := netlink.ParseIPNet(podCIDR)
+		if err != nil {
 			return err
 		}
-		fmt.Printf("Adding route %v \n", routeToDst)
-	}
 
+		// Check if the route exists to the other node's PodCIDR
+		routeToDst := netlink.Route{Dst: dst, Gw: ip}
+		route, err := netlink.RouteListFiltered(nl.GetIPFamily(ip), &routeToDst, netlink.RT_FILTER_DST)
+		if err != nil {
+			return err
+		}
+
+		// Add route if not present
+		if len(route) == 0 {
+			if err := netlink.RouteAdd(&routeToDst); err != nil {
+				return err
+			}
+			fmt.Printf("Adding route %v \n", routeToDst)
+		}
+	}
 	return nil
 }
