@@ -88,6 +88,21 @@ nodes:
 - role: worker
 EOF
 
+if [[ "${IP_FAMILY:-ipv4}" == "DualStack" ]]; then
+
+    cat <<EOF >> "${ARTIFACTS}/kind-config.yaml"
+kubeadmConfigPatches:
+- |
+  apiVersion: kubeadm.k8s.io/v1beta2
+  kind: ClusterConfiguration
+  metadata:
+    name: config
+  featureGates:
+    IPv6DualStack: true
+EOF
+
+fi
+
   # actually create the cluster
   # TODO(BenTheElder): settle on verbosity for this script
   KIND_IS_UP=true
