@@ -73,6 +73,9 @@ build() {
 
 # up a cluster with kind
 create_cluster() {
+
+  IP_FAMILY="DualStack"
+
   # create the config file
   cat <<EOF > "${ARTIFACTS}/kind-config.yaml"
 # config for 1 control plane node and 2 workers
