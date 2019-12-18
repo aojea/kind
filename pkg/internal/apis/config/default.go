@@ -58,7 +58,7 @@ func SetDefaultsCluster(obj *Cluster) {
 			obj.Networking.PodSubnet = "fd00:10:244::/64"
 		}
 		if obj.Networking.IPFamily == "DualStack" {
-			obj.Networking.PodSubnet = "10.244.0.0/16,fd00:10:244::/16"
+			obj.Networking.PodSubnet = "10.244.0.0/16,fd00:10:244::/64"
 		}
 	}
 	// default the service CIDR using the kubeadm default
