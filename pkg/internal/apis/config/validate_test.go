@@ -112,7 +112,7 @@ func TestClusterValidate(t *testing.T) {
 				SetDefaultsCluster(&c)
 				c.Networking.PodSubnet = "192.168.0.2/24,fd00:1::/25"
 				c.Networking.ServiceSubnet = "192.168.0.2/24,fd00:1::/25"
-				c.Networking.IPFamily = "DualStack"
+				c.Networking.IPFamily = DualStackFamily
 				return c
 			}(),
 			ExpectErrors: 0,
@@ -124,7 +124,7 @@ func TestClusterValidate(t *testing.T) {
 				SetDefaultsCluster(&c)
 				c.Networking.PodSubnet = "192.168.0.2/24,fd00:1::/25"
 				c.Networking.ServiceSubnet = "192.168.0.2/24,fd00:1::/25,10.0.0.0/16"
-				c.Networking.IPFamily = "DualStack"
+				c.Networking.IPFamily = DualStackFamily
 				return c
 			}(),
 			ExpectErrors: 1,
@@ -136,7 +136,7 @@ func TestClusterValidate(t *testing.T) {
 				SetDefaultsCluster(&c)
 				c.Networking.PodSubnet = "192.168.0.2/24,fd00:1::/25"
 				c.Networking.ServiceSubnet = "192.168.0.2/24"
-				c.Networking.IPFamily = "DualStack"
+				c.Networking.IPFamily = DualStackFamily
 				return c
 			}(),
 			ExpectErrors: 0,
@@ -148,7 +148,7 @@ func TestClusterValidate(t *testing.T) {
 				SetDefaultsCluster(&c)
 				c.Networking.PodSubnet = "192.168.0.2/24"
 				c.Networking.ServiceSubnet = "192.168.0.2/24,fd00:1::/25"
-				c.Networking.IPFamily = "DualStack"
+				c.Networking.IPFamily = DualStackFamily
 				return c
 			}(),
 			ExpectErrors: 0,
@@ -161,7 +161,7 @@ func TestClusterValidate(t *testing.T) {
 				SetDefaultsCluster(&c)
 				c.Networking.PodSubnet = "192.168.0.2/24,2.2.2.0/25"
 				c.Networking.ServiceSubnet = "192.168.0.2/24,2.2.2.0/25"
-				c.Networking.IPFamily = "DualStack"
+				c.Networking.IPFamily = DualStackFamily
 				return c
 			}(),
 			ExpectErrors: 2,

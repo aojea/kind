@@ -37,7 +37,7 @@ func (c *Cluster) Validate() error {
 		}
 	}
 
-	isDualStack := c.Networking.IPFamily == "DualStack"
+	isDualStack := c.Networking.IPFamily == DualStackFamily
 	// podSubnet should be a valid CIDR
 	if err := validateSubnets(c.Networking.PodSubnet, isDualStack); err != nil {
 		errs = append(errs, errors.Errorf("invalid pod subnet %v", err))
