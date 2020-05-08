@@ -42,6 +42,12 @@ func SetDefaultsCluster(obj *Cluster) {
 	}
 	if obj.Networking.IPFamily == "" {
 		obj.Networking.IPFamily = IPv4Family
+	} else if obj.Networking.IPFamily == DualStackFamily {
+		if obj.FeatureGates == nil {
+			obj.FeatureGates = make(map[string]bool)
+		}
+		// TODO: Remove feature gate once DualStack is GA
+		obj.FeatureGates["IPv6DualStack"] = true
 	}
 	// default to listening on 127.0.0.1:randomPort on ipv4
 	// and [::1]:randomPort on ipv6

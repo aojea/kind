@@ -67,6 +67,8 @@ type DerivedConfigData struct {
 	SortedFeatureGateKeys []string
 	// FeatureGatesString is of the form `Foo=true,Baz=false`
 	FeatureGatesString string
+	// KubeadmFeatureGates contains Kubeadm only feature gates
+	KubeadmFeatureGates map[string]bool
 }
 
 // Derive automatically derives DockerStableTag if not specified
@@ -90,6 +92,12 @@ func (c *ConfigData) Derive() {
 		featureGates = append(featureGates, fmt.Sprintf("%s=%t", k, v))
 	}
 	c.FeatureGatesString = strings.Join(featureGates, ",")
+
+	// kubeadm has its own feature gates ... we only care about DualStack by now
+	if ok, val := c.FeatureGates["IPv6DualStack"]; ok {
+		c.KubeadmFeatureGates = make(map[string]bool)
+		c.KubeadmFeatureGates["IPv6DualStack"] = val
+	}
 }
 
 // See docs for these APIs at:
@@ -416,6 +424,10 @@ metadata:
   name: config
 kubernetesVersion: {{.KubernetesVersion}}
 clusterName: "{{.ClusterName}}"
+{{if .KubeadmFeatureGates}}featureGates:
+{{ range $key, $value := .KubeadmFeatureGates }}
+  "{{ $key }}": {{ $value }}
+{{end}}{{end}}
 controlPlaneEndpoint: "{{ .ControlPlaneEndpoint }}"
 # on docker for mac we have to expose the api server via port forward,
 # so we need to ensure the cert is valid for localhost so we can talk

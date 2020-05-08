@@ -399,8 +399,7 @@ networking:
 ```
 
 #### Dual Stack clusters
-You can run dual stack clusters using `kind`, on kubernetes versions +1.16
-but first you need to [enable ipv6 in your docker daemon][docker enable ipv6].
+You can run dual stack clusters using `kind`, on kubernetes versions +1.18.
 
 ```yaml
 # a dual-stack cluster
@@ -412,15 +411,6 @@ nodes:
 - role: control-plane
 - role: worker
 - role: worker
-kubeadmConfigPatches:
-- |
-  apiVersion: kubeadm.k8s.io/v1beta2
-  kind: ClusterConfiguration
-  metadata:
-    name: config
-  featureGates:
-    IPv6DualStack: true
-
 ```
 
 ### Configure kind to use a proxy
