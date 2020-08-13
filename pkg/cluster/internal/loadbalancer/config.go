@@ -28,6 +28,7 @@ type ConfigData struct {
 	ControlPlanePort int
 	BackendServers   map[string]string
 	IPv6             bool
+	Docker           bool
 }
 
 // DefaultConfigTemplate is the loadbalancer config template
@@ -37,8 +38,12 @@ global
   log /dev/log local1 notice
   daemon
 
-resolvers docker
+resolvers kinddns
+  {{ if $.Docker -}}
   nameserver dns 127.0.0.11:53
+  {{- else -}}
+  parse-resolv-conf
+  {{- end }}
 
 defaults
   log global
@@ -62,7 +67,7 @@ backend kube-apiservers
   option httpchk GET /healthz
   # TODO: we should be verifying (!)
   {{range $server, $address := .BackendServers}}
-  server {{ $server }} {{ $address }} check check-ssl verify none resolvers docker resolve-prefer {{ if $.IPv6 -}} ipv6 {{- else -}} ipv4 {{- end }}
+  server {{ $server }} {{ $address }} check check-ssl verify none resolvers kinddns resolve-prefer {{ if $.IPv6 -}} ipv6 {{- else -}} ipv4 {{- end }}
   {{- end}}
 `
 

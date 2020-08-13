@@ -140,6 +140,8 @@ func commonArgs(cfg *config.Cluster) ([]string, error) {
 	args := []string{
 		"--detach", // run the container detached
 		"--tty",    // allocate a tty for entrypoint logs
+		// attach to its own network
+		"--network", fmt.Sprintf("%s-%s", fixedNetworkPrefix, cfg.Name),
 		// label the node with the cluster ID
 		"--label", fmt.Sprintf("%s=%s", clusterLabelKey, cfg.Name),
 	}
@@ -258,8 +260,9 @@ func getProxyEnv(cfg *config.Cluster) (map[string]string, error) {
 	envs := common.GetProxyEnvs(cfg)
 	// Specifically add the podman network subnets to NO_PROXY if we are using a proxy
 	if len(envs) > 0 {
-		// podman default bridge network is named "bridge" (https://docs.podman.com/network/bridge/#use-the-default-bridge-network)
-		subnets, err := getSubnets("bridge")
+		// podman creates a network per cluster
+		networkName := fmt.Sprintf("%s-%s", fixedNetworkPrefix, cfg.Name)
+		subnets, err := getSubnets(networkName)
 		if err != nil {
 			return nil, err
 		}
@@ -277,8 +280,10 @@ func getProxyEnv(cfg *config.Cluster) (map[string]string, error) {
 	return envs, nil
 }
 
-func getSubnets(networkName string) ([]string, error) {
-	format := `{{range (index (index . "IPAM") "Config")}}{{index . "Subnet"}} {{end}}`
+func getSubnets(name string) ([]string, error) {
+	networkName := fmt.Sprintf("%s-%s", fixedNetworkPrefix, name)
+	// TODO(dualstack): podman currently only supports one range per network
+	format := `'{{range (index (index  .plugins  0).ipam.ranges 0)}}{{.subnet}}{{end}}'`
 	cmd := exec.Command("podman", "network", "inspect", "-f", format, networkName)
 	lines, err := exec.CombinedOutputLines(cmd)
 	if err != nil {

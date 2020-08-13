@@ -72,6 +72,10 @@ func (p *Provider) Provision(status *cli.Status, cfg *config.Cluster) (err error
 		return err
 	}
 
+	if err := ensureNetwork(cfg.Name, clusterIsIPv6(cfg)); err != nil {
+		return errors.Wrap(err, "failed to ensure podman network")
+	}
+
 	// actually provision the cluster
 	icons := strings.Repeat("📦 ", len(cfg.Nodes))
 	status.Start(fmt.Sprintf("Preparing nodes %s", icons))
@@ -126,33 +130,41 @@ func (p *Provider) ListNodes(cluster string) ([]nodes.Node, error) {
 	return ret, nil
 }
 
-// DeleteNodes is part of the providers.Provider interface
-func (p *Provider) DeleteNodes(n []nodes.Node) error {
-	if len(n) == 0 {
-		return nil
+// DeleteCluster is part of the providers.Provider interface
+func (p *Provider) DeleteCluster(name string) error {
+	n, err := p.ListNodes(name)
+	if err != nil {
+		return errors.Wrap(err, "error listing nodes")
 	}
-	const command = "podman"
-	args := make([]string, 0, len(n)+3) // allocate once
-	args = append(args,
-		"rm",
-		"-f", // force the container to be delete now
-		"-v", // delete volumes
-	)
-	for _, node := range n {
-		args = append(args, node.String())
-	}
-	if err := exec.Command(command, args...).Run(); err != nil {
-		return errors.Wrap(err, "failed to delete nodes")
-	}
-	var nodeVolumes []string
-	for _, node := range n {
-		volumes, err := getVolumes(node.String())
-		if err != nil {
+
+	// delete nodes
+	if len(n) != 0 {
+		const command = "podman"
+		args := make([]string, 0, len(n)+3) // allocate once
+		args = append(args,
+			"rm",
+			"-f", // force the container to be delete now
+			"-v", // delete volumes
+		)
+		for _, node := range n {
+			args = append(args, node.String())
+		}
+		if err := exec.Command(command, args...).Run(); err != nil {
+			return errors.Wrap(err, "failed to delete nodes")
+		}
+		var nodeVolumes []string
+		for _, node := range n {
+			volumes, err := getVolumes(node.String())
+			if err != nil {
+				return err
+			}
+			nodeVolumes = append(nodeVolumes, volumes...)
+		}
+		if err := deleteVolumes(nodeVolumes); err != nil {
 			return err
 		}
-		nodeVolumes = append(nodeVolumes, volumes...)
 	}
-	return deleteVolumes(nodeVolumes)
+	return deleteNetwork(name)
 }
 
 // GetAPIServerEndpoint is part of the providers.Provider interface
@@ -238,16 +250,10 @@ func (p *Provider) GetAPIServerInternalEndpoint(cluster string) (string, error) 
 	}
 	n, err := nodeutils.APIServerEndpointNode(allNodes)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get apiserver endpoint")
+		return "", errors.Wrap(err, "failed to get api server endpoint")
 	}
-	// TODO: check cluster IP family and return the correct IP
-	// This means IPv6 singlestack is broken on podman
-	ipv4, _, err := n.IP()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get apiserver IP")
-	}
-	return net.JoinHostPort(ipv4, fmt.Sprintf("%d", common.APIServerInternalPort)), nil
-
+	// NOTE: we're using the nodes's hostnames which are their names
+	return net.JoinHostPort(n.String(), fmt.Sprintf("%d", common.APIServerInternalPort)), nil
 }
 
 // node returns a new node handle for this provider
@@ -305,4 +311,9 @@ func (p *Provider) CollectLogs(dir string, nodes []nodes.Node) error {
 	// run and collect up all errors
 	errs = append(errs, errors.AggregateConcurrent(fns))
 	return errors.NewAggregate(errs)
+}
+
+// Name returns provider name
+func (p *Provider) Name() string {
+	return "podman"
 }

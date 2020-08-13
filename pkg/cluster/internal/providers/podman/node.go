@@ -53,7 +53,7 @@ func (n *node) Role() (string, error) {
 func (n *node) IP() (ipv4 string, ipv6 string, err error) {
 	// retrieve the IP address of the node using podman inspect
 	cmd := exec.Command("podman", "inspect",
-		"-f", "{{.NetworkSettings.IPAddress}},{{.NetworkSettings.GlobalIPv6Address}}",
+		"-f", "\"{{range .NetworkSettings.Networks}}{{.IPAddress}},{{.GlobalIPv6Address}}{{end}}\"",
 		n.name, // ... against the "node" container
 	)
 	lines, err := exec.OutputLines(cmd)
@@ -63,7 +63,10 @@ func (n *node) IP() (ipv4 string, ipv6 string, err error) {
 	if len(lines) != 1 {
 		return "", "", errors.Errorf("file should only be one line, got %d lines", len(lines))
 	}
-	ips := strings.Split(lines[0], ",")
+	// TODO: investigate where the double quotes are added
+	// it does not seem to happen running from the CLI
+	line := strings.ReplaceAll(lines[0], "\"", "")
+	ips := strings.Split(line, ",")
 	if len(ips) != 2 {
 		return "", "", errors.Errorf("container addresses should have 2 values, got %d values", len(ips))
 	}

@@ -193,3 +193,8 @@ func (p *Provider) CollectLogs(name, dir string) error {
 	}
 	return p.provider.CollectLogs(dir, n)
 }
+
+// Name returns provider name
+func (p *Provider) Name() string {
+	return p.provider.Name()
+}

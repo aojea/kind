@@ -26,6 +26,8 @@ import (
 // Provider represents a provider of cluster / node infrastructure
 // This is an alpha-grade internal API
 type Provider interface {
+	// Name returns the provider name
+	Name() string
 	// Provision should create and start the nodes, just short of
 	// actually starting up Kubernetes, based on the given cluster config
 	Provision(status *cli.Status, cfg *config.Cluster) error
@@ -35,10 +37,8 @@ type Provider interface {
 	// ListNodes returns the nodes under this provider for the given
 	// cluster name, they may or may not be running correctly
 	ListNodes(cluster string) ([]nodes.Node, error)
-	// DeleteNodes deletes the provided list of nodes
-	// These should be from results previously returned by this provider
-	// E.G. by ListNodes()
-	DeleteNodes([]nodes.Node) error
+	// DeleteCluster deletes the cluster resources (nodes and/or network)
+	DeleteCluster(cluster string) error
 	// GetAPIServerEndpoint returns the host endpoint for the cluster's API server
 	GetAPIServerEndpoint(cluster string) (string, error)
 	// GetAPIServerEndpoint returns the internal network endpoint for the cluster's API server

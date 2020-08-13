@@ -124,8 +124,13 @@ func (p *Provider) ListNodes(cluster string) ([]nodes.Node, error) {
 	return ret, nil
 }
 
-// DeleteNodes is part of the providers.Provider interface
-func (p *Provider) DeleteNodes(n []nodes.Node) error {
+// DeleteCluster is part of the providers.Provider interface
+func (p *Provider) DeleteCluster(name string) error {
+	n, err := p.ListNodes(name)
+	if err != nil {
+		return errors.Wrap(err, "error listing nodes")
+	}
+
 	if len(n) == 0 {
 		return nil
 	}
@@ -274,4 +279,9 @@ func (p *Provider) CollectLogs(dir string, nodes []nodes.Node) error {
 	// run and collect up all errors
 	errs = append(errs, errors.AggregateConcurrent(fns))
 	return errors.NewAggregate(errs)
+}
+
+// Name returns provider name
+func (p *Provider) Name() string {
+	return "docker"
 }

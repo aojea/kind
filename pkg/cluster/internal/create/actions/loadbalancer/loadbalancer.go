@@ -79,6 +79,7 @@ func (a *Action) Execute(ctx *actions.ActionContext) error {
 		ControlPlanePort: common.APIServerInternalPort,
 		BackendServers:   backendServers,
 		IPv6:             ctx.Config.Networking.IPFamily == config.IPv6Family,
+		Docker:           ctx.Provider.Name() == "docker",
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to generate loadbalancer config data")
