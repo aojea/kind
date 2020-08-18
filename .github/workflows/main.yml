@@ -16,9 +16,6 @@ jobs:
       fail-fast: false
       matrix:
         ipFamily: [ipv4, ipv6]
-        exclude:
-          # exclude IPv6
-          - ipFamily: ipv6
     env:
       JOB_NAME: "podman-${{ matrix.ipFamily }}"
       KIND_EXPERIMENTAL_PROVIDER: "podman"
@@ -78,9 +75,6 @@ jobs:
       fail-fast: false
       matrix:
         ipFamily: [ipv4, ipv6]
-        exclude:
-          # exclude IPv6
-          - ipFamily: ipv6
     env:
       JOB_NAME: "podman-multinode-${{ matrix.ipFamily }}"
       KIND_EXPERIMENTAL_PROVIDER: "podman"
@@ -112,7 +106,7 @@ jobs:
 
     - name: Create cluster
       run: |
-        cat <<EOF | sudo KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster -v7 --wait 1m --retain -config=-
+        cat <<EOF | sudo KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster -v7 --wait 1m --retain --config=-
         kind: Cluster
         apiVersion: kind.x-k8s.io/v1alpha4
         networking:
