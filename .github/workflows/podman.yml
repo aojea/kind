@@ -16,11 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         ipFamily: [ipv4, ipv6]
-        deployment: [singleNode, multiNode]
-        exclude:
-          # exclude IPv6 and multinode
-          - ipFamily: ipv6
-          - deployment: multiNode
+        deployment: [singleNode, multiNode, HA]
     env:
       JOB_NAME: "podman-${{ matrix.deployment }}-${{ matrix.ipFamily }}"
       KIND_EXPERIMENTAL_PROVIDER: "podman"
@@ -32,25 +28,73 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.14'
+
     - name: Verify
       run: make verify
 
     - name: Install kind
       run: sudo make install INSTALL_DIR=/usr/local/bin
 
-    - name: Install podman
+    - name: Install kubectl
       run: |
-        . /etc/os-release
-        echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
-        curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key | sudo apt-key add -
-        sudo apt-get update -qq
-        sudo apt-get -qq -y install podman
+        curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+        chmod +x ./kubectl
+        sudo mv ./kubectl /usr/local/bin/kubectl
+
+    - name: Enable ipv4 and ipv6 forwarding
+      run: |
+        sudo sysctl -w net.ipv6.conf.all.forwarding=1
+        sudo sysctl -w net.ipv4.ip_forward=1
+
+    - name: Get podman version with IPv6 fix (https://github.com/containers/podman/pull/7314)
+      run: |
+        export GOPATH=$(go env GOPATH)
+
+        sudo apt-get -y install \
+        btrfs-tools \
+        git \
+        go-md2man \
+        iptables \
+        libassuan-dev \
+        libc6-dev \
+        libdevmapper-dev \
+        libglib2.0-dev \
+        libgpgme-dev \
+        libgpg-error-dev \
+        libprotobuf-dev \
+        libprotobuf-c0-dev \
+        libseccomp-dev \
+        libselinux1-dev \
+        libsystemd-dev \
+        pkg-config \
+        runc \
+        uidmap \
+        libapparmor-dev
+
+        # Install conmon
+        git clone https://github.com/containers/conmon
+        pushd conmon
+          export GOCACHE="$(mktemp -d)"
+          make
+          sudo make podman
+        popd
+
         # Install network
         sudo mkdir -p /etc/cni/net.d
         curl -qsSL https://raw.githubusercontent.com/containers/libpod/master/cni/87-podman-bridge.conflist | sudo tee /etc/cni/net.d/87-podman-bridge.conf
         curl -qsSL https://github.com/containernetworking/plugins/releases/download/v0.8.6/cni-plugins-linux-amd64-v0.8.6.tgz --output /tmp/cni.tgz
         sudo mkdir -p /usr/libexec/cni
         sudo tar -C /usr/libexec/cni -xvzf /tmp/cni.tgz
+
+        # Install podman
+        git clone https://github.com/containers/podman/ $GOPATH/src/github.com/containers/podman
+        cd $GOPATH/src/github.com/containers/podman
+        make BUILDTAGS="selinux seccomp"
+        sudo make install PREFIX=/usr
 
     - name: Create single node cluster
       if: ${{ matrix.deployment == 'singleNode' }}
@@ -72,11 +116,31 @@ jobs:
           ipFamily: ${IP_FAMILY}
         nodes:
         - role: control-plane
-        - role: control-plane
-        - role: control-plane
         - role: worker
         - role: worker
         EOF
+
+    - name: Create multi node cluster with HA control plane
+      if: ${{ matrix.deployment == 'HA' }}
+      run: |
+        cat <<EOF | sudo KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster -v7 --wait 1m --retain --config=-
+        kind: Cluster
+        apiVersion: kind.x-k8s.io/v1alpha4
+        networking:
+          ipFamily: ${IP_FAMILY}
+        nodes:
+        - role: control-plane
+        - role: control-plane
+        - role: control-plane
+        - role: worker
+        EOF
+
+    - name: Get Cluster status
+      run: |
+        # wait network is ready
+        sudo kubectl wait --for=condition=ready pods --namespace=kube-system -l k8s-app=kube-dns
+        sudo kubectl get nodes -o wide
+        sudo kubectl get pods -A
 
       # TODO: implement this
     - name: Load docker image
