@@ -222,23 +222,31 @@ func (p *Provider) GetAPIServerEndpoint(cluster string) (string, error) {
 				return "", err
 			}
 			for _, pm := range v {
-				if containerPort == common.APIServerInternalPort && protocol == "tcp" {
+				if containerPort == common.APIServerInternalPort && protocol == "tcp" && pm.HostIP != "::1" {
 					return net.JoinHostPort(pm.HostIP, pm.HostPort), nil
 				}
 			}
 		}
-	}
-	var portMappings19 []portMapping19
-	if err := json.Unmarshal([]byte(lines[0]), &portMappings19); err != nil {
-		return "", errors.Errorf("invalid network details: %v", err)
-	}
-	for _, pm := range portMappings19 {
-		if pm.ContainerPort == common.APIServerInternalPort && pm.Protocol == "tcp" {
-			return net.JoinHostPort(pm.HostIP, strconv.Itoa(int(pm.HostPort))), nil
+	} else {
+		var portMappings19 []portMapping19
+		if err := json.Unmarshal([]byte(lines[0]), &portMappings19); err != nil {
+			return "", errors.Errorf("invalid network details: %v", err)
+		}
+		for _, pm := range portMappings19 {
+			if pm.ContainerPort == common.APIServerInternalPort && pm.Protocol == "tcp" && pm.HostIP != "::1" {
+				return net.JoinHostPort(pm.HostIP, strconv.Itoa(int(pm.HostPort))), nil
+			}
 		}
 	}
 
-	return "", errors.Errorf("unable to find apiserver endpoint information")
+	// podman does not support portmapping on localhost for IPv6
+	// if we don't find the portmapping we return the API IP and Port directly
+	// because it must be reachable for podman and IPv6
+	_, ipv6, err := n.IP()
+	if ipv6 == "" || err != nil {
+		return "", errors.Errorf("unable to find apiserver endpoint information")
+	}
+	return net.JoinHostPort(ipv6, fmt.Sprintf("%d", common.APIServerInternalPort)), nil
 }
 
 // GetAPIServerInternalEndpoint is part of the providers.Provider interface
