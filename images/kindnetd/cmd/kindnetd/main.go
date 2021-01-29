@@ -40,6 +40,7 @@ import (
 // - HOST_IP: should be populated by downward API
 // - POD_IP: should be populated by downward API
 // - CNI_CONFIG_TEMPLATE: the cni .conflist template, run with {{ .PodCIDR }}
+// - CONTROL_PLANE_ENDPOINT: control-plane endpoint format https://host:port
 
 // TODO: improve logging & error handling
 
@@ -54,6 +55,14 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+
+	// override the internal apiserver endpoint to avoid
+	// waiting for kube-proxy to install the services rules
+	controlPlaneEndpoint := os.Getenv("CONTROL_PLANE_ENDPOINT")
+	if apiserverUrl != "" {
+		config.Host = controlPlaneEndpoint
+	}
+
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
@@ -194,3 +203,4 @@ func internalIP(node corev1.Node) string {
 	}
 	return ""
 }
+z

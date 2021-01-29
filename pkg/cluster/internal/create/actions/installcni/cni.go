@@ -51,7 +51,6 @@ func (a *action) Execute(ctx *actions.ActionContext) error {
 		return err
 	}
 	node := controlPlanes[0] // kind expects at least one always
-
 	// read the manifest from the node
 	var raw bytes.Buffer
 	if err := node.Command("cat", "/kind/manifests/default-cni.yaml").SetStdout(&raw).Run(); err != nil {
@@ -71,11 +70,19 @@ func (a *action) Execute(ctx *actions.ActionContext) error {
 		if err != nil {
 			return errors.Wrap(err, "failed to parse CNI manifest template")
 		}
+		// Add the controlplane endpoint so kindnet doesn´t have to wait for kube-proxy
+		controlPlaneEndpoint, err := ctx.Provider.GetAPIServerInternalEndpoint(ctx.Config.Name)
+		if err != nil {
+			return err
+		}
+
 		var out bytes.Buffer
 		err = t.Execute(&out, &struct {
-			PodSubnet string
+			PodSubnet            string
+			ControlPlaneEndpoint string
 		}{
-			PodSubnet: ctx.Config.Networking.PodSubnet,
+			PodSubnet:            ctx.Config.Networking.PodSubnet,
+			ControlPlaneEndpoint: controlPlaneEndpoint,
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to execute CNI manifest template")
