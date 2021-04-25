@@ -20,8 +20,15 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/coreos/go-iptables/iptables"
 )
+
+type metaIPMasqAgent struct {
+	ipv4MasqAgent *IPMasqAgent
+	ipv6MasqAgent *IPMasqAgent
+}
 
 // NewIPMasqAgent returns a new IPMasqAgent
 func NewIPMasqAgent(ipv6 bool, noMasqueradeCIDRs []string) (*IPMasqAgent, error) {
@@ -49,6 +56,25 @@ type IPMasqAgent struct {
 	iptables          *iptables.IPTables
 	masqChain         string
 	noMasqueradeCIDRs []string
+}
+
+// AddCIDR add new cidr that don't need masquerade
+// this is not thread safe
+func (ma *IPMasqAgent) AddCIDR(cidr string) {
+	noMasqSet := sets.NewString(ma.noMasqueradeCIDRs...)
+	// insert if cidr masq doesn't exist
+	if !noMasqSet.Has(cidr) {
+		ma.noMasqueradeCIDRs = append(ma.noMasqueradeCIDRs, cidr)
+	}
+}
+
+// RemoveCIDR remove cidr that don't need masquerade
+// this is not thread safe
+func (ma *IPMasqAgent) RemoveCIDRs(cidr string) {
+	noMasqSet := sets.NewString(ma.noMasqueradeCIDRs...)
+	if noMasqSet.Has(cidr) {
+		ma.noMasqueradeCIDRs = noMasqSet.Delete(cidr).List()
+	}
 }
 
 // SyncRulesForever syncs ip masquerade rules forever

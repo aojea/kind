@@ -37,6 +37,8 @@ import (
 
 const (
 	probeTCPtimeout = 1 * time.Second
+	fullMaskIPv4    = 32
+	fullMaskIPv6    = 128
 )
 
 // kindnetd is a simple networking daemon to complete kind's CNI implementation
