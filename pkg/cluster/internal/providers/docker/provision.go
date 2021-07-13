@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/kind/pkg/fs"
 
 	"sigs.k8s.io/kind/pkg/cluster/internal/loadbalancer"
-	"sigs.k8s.io/kind/pkg/cluster/internal/providers/provider/common"
+	"sigs.k8s.io/kind/pkg/cluster/internal/providers/common"
 	"sigs.k8s.io/kind/pkg/internal/apis/config"
 )
 
@@ -63,7 +63,8 @@ func planCreation(cfg *config.Cluster, networkName string) (createContainerFuncs
 		// For now remote docker + multi control plane is not supported
 		apiServerPort = 0              // replaced with random ports
 		apiServerAddress = "127.0.0.1" // only the LB needs to be non-local
-		if clusterIsIPv6(cfg) {
+		// only for IPv6 only clusters
+		if cfg.Networking.IPFamily == config.IPv6Family {
 			apiServerAddress = "::1" // only the LB needs to be non-local
 		}
 		// plan loadbalancer node
@@ -134,7 +135,7 @@ func createContainer(args []string) error {
 }
 
 func clusterIsIPv6(cfg *config.Cluster) bool {
-	return cfg.Networking.IPFamily == "ipv6"
+	return cfg.Networking.IPFamily == config.IPv6Family || cfg.Networking.IPFamily == config.DualStackFamily
 }
 
 func clusterHasImplicitLoadBalancer(cfg *config.Cluster) bool {
@@ -183,6 +184,9 @@ func commonArgs(cluster string, cfg *config.Cluster, networkName string, nodeNam
 		// however this _actually_ means the same thing as always
 		// so the closest thing is on-failure:1, which will retry *once*
 		"--restart=on-failure:1",
+		// this can be enabled by default in docker daemon.json, so we explicitly
+		// disable it, we want our entrypoint to be PID1, not docker-init / tini
+		"--init=false",
 	}
 
 	// enable IPv6 if necessary
@@ -236,11 +240,14 @@ func runArgsForNode(node *config.Node, clusterIPFamily config.ClusterIPFamily, n
 		// filesystem, which is not only better for performance, but allows
 		// running kind in kind for "party tricks"
 		// (please don't depend on doing this though!)
-		"--volume", "/var/lib/containerd",
-		"--volume", "/var/lib/kubelet",
-		"--volume", "/var/log",
+		"--volume", "/var",
 		// some k8s things want to read /lib/modules
 		"--volume", "/lib/modules:/lib/modules:ro",
+		// propagate KIND_EXPERIMENTAL_CONTAINERD_SNAPSHOTTER to the entrypoint script
+		"-e", "KIND_EXPERIMENTAL_CONTAINERD_SNAPSHOTTER",
+		// enable /dev/fuse explicitly for fuse-overlayfs
+		// (Rootless Docker does not automatically mount /dev/fuse with --privileged)
+		"--device", "/dev/fuse",
 	},
 		args...,
 	)
@@ -252,6 +259,11 @@ func runArgsForNode(node *config.Node, clusterIPFamily config.ClusterIPFamily, n
 		return nil, err
 	}
 	args = append(args, mappingArgs...)
+
+	switch node.Role {
+	case config.ControlPlaneRole:
+		args = append(args, "-e", "KUBECONFIG=/etc/kubernetes/admin.conf")
+	}
 
 	// finally, specify the image to run
 	return append(args, node.Image), nil
@@ -312,7 +324,7 @@ func getProxyEnv(cfg *config.Cluster, networkName string, nodeNames []string) (m
 func getSubnets(networkName string) ([]string, error) {
 	format := `{{range (index (index . "IPAM") "Config")}}{{index . "Subnet"}} {{end}}`
 	cmd := exec.Command("docker", "network", "inspect", "-f", format, networkName)
-	lines, err := exec.CombinedOutputLines(cmd)
+	lines, err := exec.OutputLines(cmd)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get subnets")
 	}

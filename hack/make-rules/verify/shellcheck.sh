@@ -20,7 +20,7 @@ set -o nounset
 set -o pipefail
 
 # cd to the repo root
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." &> /dev/null && pwd -P)"
 cd "${REPO_ROOT}"
 
 # upstream shellcheck latest stable image as of January 10th, 2019
@@ -39,7 +39,7 @@ done < <(grep -irl '#!.*sh' . | grep -Ev '^(\./\.git/)|(\./vendor/)|(\./bin/)')
 # common arguments we'll pass to shellcheck
 SHELLCHECK_OPTIONS=(
   # allow following sourced files that are not specified in the command,
-  # we need this because we specify one file at at time in order to trivially
+  # we need this because we specify one file at a time in order to trivially
   # detect which files are failing
   '--external-sources'
   # disabled lint codes

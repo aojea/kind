@@ -17,7 +17,7 @@
 set -o errexit -o nounset -o pipefail
 
 # cd to the repo root and setup go
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." &> /dev/null && pwd -P)"
 cd "${REPO_ROOT}"
 source hack/build/setup-go.sh
 
@@ -32,8 +32,9 @@ cd "${REPO_ROOT}"
 # we also need to populate vendor
 
 # run the generators
-bin/deepcopy-gen -i ./pkg/internal/apis/config/ -O zz_generated.deepcopy --go-header-file hack/tools/boilerplate.go.txt
-bin/deepcopy-gen -i ./pkg/apis/config/v1alpha4 -O zz_generated.deepcopy --go-header-file hack/tools/boilerplate.go.txt
+# TODO: -o "${REPO_ROOT}/../.." is a weird work-around ...
+bin/deepcopy-gen -i ./pkg/internal/apis/config/ -o "${REPO_ROOT}/../.." -O zz_generated.deepcopy --go-header-file hack/tools/boilerplate.go.txt
+bin/deepcopy-gen -i ./pkg/apis/config/v1alpha4 -o "${REPO_ROOT}/../.." -O zz_generated.deepcopy --go-header-file hack/tools/boilerplate.go.txt
 
 
 # set module mode back, return to repo root and gofmt to ensure we format generated code

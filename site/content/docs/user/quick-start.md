@@ -5,29 +5,34 @@ menu:
     parent: "user"
     identifier: "user-quick-start"
     weight: 1
+toc: true
+description: |-
+  This guide covers getting started with the `kind` command.
+
+  **If you are having problems please see the [known issues] guide.**
+
+  [known issues]: /docs/user/known-issues
 ---
-# Quick Start
-
-This guide covers getting started with the `kind` command.
-
-**If you are having problems please see the [known issues] guide.**
-
 ## Installation
 
-**NOTE**: `kind` does not require [`kubectl`](https://kubernetes.io/docs/reference/kubectl/overview/),
-but you will not be able to perform some of the examples in our docs without it.
-To install `kubectl` see the upstream reference here https://kubernetes.io/docs/tasks/tools/install-kubectl/
+> **NOTE**: `kind` does not require [`kubectl`](https://kubernetes.io/docs/reference/kubectl/overview/),
+> but you will not be able to perform some of the examples in our docs without it.
+> To install `kubectl` see the upstream [kubectl installation docs](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
 
-You can either install kind with `GO111MODULE="on" go get sigs.k8s.io/kind@v0.8.1` or clone this repo 
+You can either install kind with `GO111MODULE="on" go get sigs.k8s.io/kind@{{< stableVersion >}}` or clone this repo
 and run `make build` from the repository.
 
 Please use the latest Go when installing KIND from source, ideally go 1.14 or greater.
 
-This will put `kind` in `$(go env GOPATH)/bin`. You may need to add that directory to your `$PATH` as
+`go get` will put `kind` in `$(go env GOPATH)/bin`. You may need to add that directory to your `$PATH` as
 shown [here](https://golang.org/doc/code.html#GOPATH) if you encounter the error
 `kind: command not found` after installation.
 
-Without installing Go, kind can be built reproducibly with docker using `make build`.
+> **NOTE**: `go get` should not be run from a Go [modules] enabled project directory,
+> as go get inside a modules enabled project updates dependencies / behaves differently. Try for example `cd $HOME` first.
+
+Without installing Go, kind can be built reproducibly with docker using `make build`,
+the binary will be in `bin/kind`.
 
 Stable binaries are also available on the [releases] page.
 Stable releases are generally recommended for CI usage in particular.
@@ -37,24 +42,35 @@ into your `$PATH`.
 On Linux:
 
 {{< codeFromInline lang="bash" >}}
-curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-linux-amd64
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/{{< stableVersion >}}/kind-linux-amd64
 chmod +x ./kind
 mv ./kind /some-dir-in-your-PATH/kind
 {{< /codeFromInline >}}
 
-On Mac (homebrew): 
+On macOS via Homebrew:
+
 {{< codeFromInline lang="bash" >}}
-   brew install kind
+brew install kind
 {{< /codeFromInline >}}
-or
+
+On macOS via MacPorts:
+
 {{< codeFromInline lang="bash" >}}
-curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-darwin-amd64
+sudo port selfupdate && sudo port install kind
+{{< /codeFromInline >}}
+
+On macOS via Bash:
+
+{{< codeFromInline lang="bash" >}}
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/{{< stableVersion >}}/kind-darwin-amd64
+chmod +x ./kind
+mv ./kind /some-dir-in-your-PATH/kind
 {{< /codeFromInline >}}
 
 On Windows:
 
 {{< codeFromInline lang="powershell" >}}
-curl.exe -Lo kind-windows-amd64.exe https://kind.sigs.k8s.io/dl/v0.8.1/kind-windows-amd64
+curl.exe -Lo kind-windows-amd64.exe https://kind.sigs.k8s.io/dl/{{< stableVersion >}}/kind-windows-amd64
 Move-Item .\kind-windows-amd64.exe c:\some-dir-in-your-PATH\kind.exe
 {{< /codeFromInline >}}
 
@@ -69,11 +85,16 @@ choco install kind
 Creating a Kubernetes cluster is as simple as `kind create cluster`.
 
 This will bootstrap a Kubernetes cluster using a pre-built
-[node image][node image] - you can find it on docker hub
-[`kindest/node`][kindest/node].
-If you desire to build the node image yourself see the
-[building image](#building-images) section.
-To specify another image use the `--image` flag.
+[node image][node image]. Prebuilt images are hosted at[`kindest/node`][kindest/node], but to find images suitable for a given release currently you should check the [release notes] for your given kind version (check with `kind version`) where
+you'll find a complete listing of images created for a kind release.
+
+To specify another image use the `--image` flag -- `kind create cluster --image=...`.
+
+Using a different image allows you to change the Kubernetes version of the created
+cluster.
+
+If you desire to build the node image yourself with a custom version see the
+[building images](#building-images) section.
 
 By default, the cluster will be given the name `kind`.
 Use the `--name` flag to assign the cluster a different context name.
@@ -82,6 +103,8 @@ If you want the `create cluster` command to block until the control plane
 reaches a ready status, you can use the `--wait` flag and specify a timeout.
 To use `--wait` you must specify the units of the time to wait. For example, to
 wait for 30 seconds, do `--wait 30s`, for 5 minutes do `--wait 5m`, etc.
+
+More usage can be discovered with `kind create cluster --help`.
 
 ## Interacting With Your Cluster
 
@@ -138,11 +161,12 @@ context name `kind` and delete that cluster.
 ## Loading an Image Into Your Cluster
 
 Docker images can be loaded into your cluster nodes with:
-`kind load docker-image my-custom-image`
 
-**Note**: If using a named cluster you will need to specify the name of the 
-cluster you wish to load the image into:
-`kind load docker-image my-custom-image --name kind-2`
+`kind load docker-image my-custom-image-0 my-custom-image-1`
+
+> **Note**: If using a named cluster you will need to specify the name of the
+> cluster you wish to load the images into:
+> `kind load docker-image my-custom-image-0 my-custom-image-1 --name kind-2`
 
 Additionally, image archives can be loaded with:
 `kind load image-archive /my-image-archive.tar`
@@ -154,32 +178,32 @@ kind load docker-image my-custom-image:unique-tag
 kubectl apply -f my-manifest-using-my-image:unique-tag
 ```
 
-**Note**: You can get a list of images present on a cluster node by
+> **NOTE**: You can get a list of images present on a cluster node by
 using `docker exec`:
-```
-docker exec -it my-node-name crictl images
-```
-Where `my-node-name` is the name of the Docker container.
+> ```
+> docker exec -it my-node-name crictl images
+> ```
+> Where `my-node-name` is the name of the Docker container (e.g. `kind-control-plane`).
 
-**Note**: The Kubernetes default pull policy is `IfNotPresent` unless
-the image tag is `:latest` in which case the default policy is `Always`.
+> **NOTE**: The Kubernetes default pull policy is `IfNotPresent` unless
+the image tag is `:latest` or omitted (and implicitly `:latest`) in which case the default policy is `Always`.
 `IfNotPresent` causes the Kubelet to skip pulling an image if it already exists.
-If you want those images loaded into node to work as expected, please:
-
-- don't use a `:latest` tag
-
-and / or:
-
-- specify `imagePullPolicy: IfNotPresent` or `imagePullPolicy: Never` on your container(s).
-
-See [Kubernetes imagePullPolicy][Kubernetes imagePullPolicy] for more information.
+> If you want those images loaded into node to work as expected, please:
+>
+> - don't use a `:latest` tag
+>
+> and / or:
+>
+> - specify `imagePullPolicy: IfNotPresent` or `imagePullPolicy: Never` on your container(s).
+>
+> See [Kubernetes imagePullPolicy][Kubernetes imagePullPolicy] for more information.
 
 
 See also: [Using kind with Private Registries][Private Registries].
 
 ## Building Images
 
-> Note: If you're using Docker Desktop, be sure to read [Settings for Docker Desktop](#settings-for-docker-desktop) first.
+> **NOTE**: If you're using Docker Desktop, be sure to read [Settings for Docker Desktop](#settings-for-docker-desktop) first.
 
 kind runs a local Kubernetes cluster by using Docker containers as "nodes".
 kind uses the [`node-image`][node image] to run Kubernetes artifacts, such
@@ -188,40 +212,25 @@ The `node-image` in turn is built off the [`base-image`][base image], which
 installs all the dependencies needed for Docker and Kubernetes to run in a
 container.
 
-See [building the base image](#building-the-base-image) for more advanced information.
-
-Currently, kind supports two different ways to build a `node-image`
+Currently, kind supports one default way to build a `node-image`
 if you have the [Kubernetes][kubernetes] source in your host machine
-(`$GOPATH/src/k8s.io/kubernetes`), by using `docker` or `bazel`.
-To specify the build type use the flag `--type`.
-Note however that using `--type=bazel` on Windows or MacOS will not work
-currently due to Kubelet using [CGO] which requires GCC/glibc for linux.
-A workaround may be enabled in the future.
+(`$GOPATH/src/k8s.io/kubernetes`), by using `docker`.
 
-kind will default to using the build type `docker` if none is specified.
-
-```
-kind build node-image --type bazel
-```
-
-Similarly as for the base-image command, you can specify the name and tag of
-the resulting node image using the flag `--image`.
-
-If you previously changed the name and tag of the base image, you can use here
-the flag `--base-image` to specify the name and tag you used.
-
+> **NOTE**: Building Kubernetes node-images requires everything building upstream
+> Kubernetes requires, we wrap the upstream build. This includes Docker with buildx.
+> See: https://git.k8s.io/community/contributors/devel/development.md#building-kubernetes-with-docker
 
 ### Settings for Docker Desktop
 
-If you are building Kubernetes (for example - `kind build node-image`) on MacOS or Windows then you need a minimum of 6GB of RAM 
+If you are building Kubernetes (for example - `kind build node-image`) on MacOS or Windows then you need a minimum of 6GB of RAM
 dedicated to the virtual machine (VM) running the Docker engine. 8GB is recommended.
 
 To change the resource limits for the Docker on Mac, you'll need to open the
-**Preferences** menu.  
+**Preferences** menu.
 <img src="/docs/user/images/docker-pref-1.png"/>
 
 Now, go to the **Advanced** settings page, and change the
-settings there, see [changing Docker's resource limits][Docker resource lims].  
+settings there, see [changing Docker's resource limits][Docker resource lims].
 <img src="/docs/user/images/docker-pref-2.png" alt="Setting 8Gb of memory in Docker for Mac" />
 
 
@@ -232,7 +241,7 @@ to do that first before opening "Settings"
 <img src="/docs/user/images/docker-pref-1-win.png"/>
 
 Now, go to the **Advanced** settings page, and change the
-settings there, see [changing Docker's resource limits][Docker resource lims].  
+settings there, see [changing Docker's resource limits][Docker resource lims].
 
 <img src="/docs/user/images/docker-pref-build-win.png" alt="Setting 8Gb of memory in Docker for Windows" />
 
@@ -241,20 +250,6 @@ You may also try removing any unused data left by the Docker engine - e.g.,
 `docker system prune`.
 
 ## Advanced
-
-### Building The Base Image
-
-To build the `base-image` we use the `make quick` command in `images/base` directory:
-```
-make quick
-```
-
-By default, the base image will be tagged as `kindest/base:$(date +v%Y%m%d)-$(git describe --always --dirty)` format.
-If you want to change this, you can set `TAG` environment variable.
-
-```
-TAG=v0.1.0 make quick
-```
 
 
 ### Configuring Your kind Cluster
@@ -313,6 +308,11 @@ This can be useful if using `NodePort` services or daemonsets exposing host port
 
 Note: binding the `listenAddress` to `127.0.0.1` may affect your ability to access the service.
 
+You may want to see the [Ingress Guide] and [LoadBalancer Guide].
+
+[Ingress Guide]: /docs/user/ingress
+[LoadBalancer Guide]: /docs/user/loadbalancer
+
 #### Setting Kubernetes version
 You can also set a specific Kubernetes version by setting the `node`'s container image. You can find available image tags on the [releases page](https://github.com/kubernetes-sigs/kind/releases). Please use the `sha256` shasum for your desired kubernetes version, as seen in this example:
 
@@ -337,42 +337,6 @@ featureGates:
   FeatureGateName: true
 {{< /codeFromInline >}}
 
-#### IPv6 clusters
-You can run IPv6 single-stack clusters using `kind`, if the host that runs the docker containers support IPv6.
-Most operating systems / distros have IPv6 enabled by defualt, but you can check on Linux with the following command:
-
-```sh
-sudo sysctl net.ipv6.conf.all.disable_ipv6
-```
-
-You should see:
-
-```sh
-net.ipv6.conf.all.disable_ipv6 = 0
-```
-
-If you are using Docker on Windows or Mac, you will need to use an IPv4 port
-forward for the API Server from the host because IPv6 port forwards don't work
-on these platforms, you can do this with the following config:
-
-```yaml
-# an ipv6 cluster
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-networking:
-  ipFamily: ipv6
-  apiServerAddress: 127.0.0.1
-```
-
-On Linux all you need is:
-```yaml
-# an ipv6 cluster
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-networking:
-  ipFamily: ipv6
-```
-
 ### Configure kind to use a proxy
 If you are running kind in an environment that requires a proxy, you may need to configure kind to use it.
 
@@ -382,8 +346,8 @@ You can configure kind to use a proxy using one or more of the following [enviro
 * `HTTPS_PROXY` or `https_proxy`
 * `NO_PROXY` or `no_proxy`
 
-**Note**: If you set a proxy it would be used for all the connection requests.
-It's important that you define what addresses doesn't need to be proxied with the NO_PROXY variable, typically you should avoid to proxy your docker network range `NO_PROXY=172.17.0.0/16`
+> **NOTE**: If you set a proxy it would be passed along to everything in the kind nodes. `kind` will automatically append certain addresses into `NO_PROXY` before passing it to the nodes so that Kubernetes components connect to each other directly, but you may need to configure
+> additional addresses depending on your usage.
 
 ### Exporting Cluster Logs
 kind has the ability to export all kind related logs for you to explore.
@@ -400,7 +364,7 @@ As you can see, kind placed all the logs for the cluster `kind` in a
 temporary directory. If you want to specify a location then simply add the path
 to the directory after the command:
 ```
-kind export logs ./somedir  
+kind export logs ./somedir
 Exported logs to: ./somedir
 ```
 
@@ -417,7 +381,7 @@ The structure of the logs will look more or less like this:
     ├── kubernetes-version.txt
     └── pods/
 ```
-The logs contain information about the Docker host, the containers running 
+The logs contain information about the Docker host, the containers running
 kind, the Kubernetes cluster itself, etc.
 
 [go-supported]: https://golang.org/doc/devel/release.html#policy
@@ -425,8 +389,7 @@ kind, the Kubernetes cluster itself, etc.
 [releases]: https://github.com/kubernetes-sigs/kind/releases
 [node image]: /docs/design/node-image
 [base image]: /docs/design/base-image
-[kind-example-config]: https://raw.githubusercontent.com/kubernetes-sigs/kind/master/site/content/docs/user/kind-example-config.yaml
-[pkg/build/base/base.go]: https://github.com/kubernetes-sigs/kind/tree/master/pkg/build/base/base.go
+[kind-example-config]: https://raw.githubusercontent.com/kubernetes-sigs/kind/main/site/content/docs/user/kind-example-config.yaml
 [kubernetes]: https://github.com/kubernetes/kubernetes
 [kindest/node]: https://hub.docker.com/r/kindest/node/
 [kubectl]: https://kubernetes.io/docs/reference/kubectl/overview/
@@ -438,3 +401,4 @@ kind, the Kubernetes cluster itself, etc.
 [Private Registries]: /docs/user/private-registries
 [customize control plane with kubeadm]: https://kubernetes.io/docs/setup/independent/control-plane-flags/
 [access multiple clusters]: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/
+[release notes]: https://github.com/kubernetes-sigs/kind/releases

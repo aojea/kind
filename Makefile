@@ -36,9 +36,12 @@ PATH:=$(shell . hack/build/setup-go.sh && echo "$${PATH}")
 GOROOT:=
 # enable modules
 GO111MODULE=on
-export PATH GOROOT GO111MODULE
+# disable CGO by default for static binaries
+CGO_ENABLED=0
+export PATH GOROOT GO111MODULE CGO_ENABLED
 # work around broken PATH export
-SHELL:=env PATH=$(PATH) $(SHELL)
+SPACE:=$(subst ,, )
+SHELL:=env PATH=$(subst $(SPACE),\$(SPACE),$(PATH)) $(SHELL)
 ################################################################################
 # ============================== OPTIONS =======================================
 # install tool
@@ -48,7 +51,7 @@ INSTALL_DIR?=$(shell hack/build/goinstalldir.sh)
 # the output binary name, overridden when cross compiling
 KIND_BINARY_NAME?=kind
 # build flags for the kind binary
-# - reproducible builds: -trimpath and -ldlflags=-buildid=
+# - reproducible builds: -trimpath and -ldflags=-buildid=
 # - smaller binaries: -w (trim debugger data, but not panics)
 # - metadata: -X=... to bake in git commit
 KIND_BUILD_FLAGS?=-trimpath -ldflags="-buildid= -w -X=sigs.k8s.io/kind/pkg/cmd/kind/version.GitCommit=$(COMMIT)"
@@ -58,25 +61,31 @@ KIND_BUILD_FLAGS?=-trimpath -ldflags="-buildid= -w -X=sigs.k8s.io/kind/pkg/cmd/k
 all: build
 # builds kind in a container, outputs to $(OUT_DIR)
 kind:
-	go build -v -o $(OUT_DIR)/$(KIND_BINARY_NAME) $(KIND_BUILD_FLAGS)
+	go build -v -o "$(OUT_DIR)/$(KIND_BINARY_NAME)" $(KIND_BUILD_FLAGS)
 # alias for building kind
 build: kind
 # use: make install INSTALL_DIR=/usr/local/bin
 install: build
 	$(INSTALL) -d $(INSTALL_DIR)
-	$(INSTALL) $(OUT_DIR)/$(KIND_BINARY_NAME) $(INSTALL_DIR)/$(KIND_BINARY_NAME)
+	$(INSTALL) "$(OUT_DIR)/$(KIND_BINARY_NAME)" "$(INSTALL_DIR)/$(KIND_BINARY_NAME)"
 ################################################################################
 # ================================= Testing ====================================
 # unit tests (hermetic)
 unit:
-	hack/make-rules/unit.sh
+	MODE=unit hack/make-rules/test.sh
+# integration tests
+integration:
+	MODE=integration hack/make-rules/test.sh
+# all tests
+test:
+	hack/make-rules/test.sh
 ################################################################################
 # ================================= Cleanup ====================================
 # standard cleanup target
 # TODO: remove the vendor part in the future. We no longer populate vendor
 clean:
-	rm -rf $(OUT_DIR)/
-	rm -rf $(REPO_ROOT)/vendor/
+	rm -rf "$(OUT_DIR)/"
+	rm -rf "$(REPO_ROOT)/vendor/"
 ################################################################################
 # ============================== Auto-Update ===================================
 # update generated code, gofmt, etc.

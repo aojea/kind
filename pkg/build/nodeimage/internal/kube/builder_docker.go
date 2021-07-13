@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/version"
+
 	"sigs.k8s.io/kind/pkg/errors"
 	"sigs.k8s.io/kind/pkg/exec"
 	"sigs.k8s.io/kind/pkg/log"
@@ -63,50 +65,73 @@ func (b *dockerBuilder) Build() (Bits, error) {
 		return nil, err
 	}
 
+	// capture version info
+	sourceVersionRaw, err := sourceVersion(b.kubeRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	kubeVersion, err := version.ParseSemantic(sourceVersionRaw)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse source version")
+	}
+
+	makeVars := []string{
+		// ensure the build isn't especially noisy..
+		"KUBE_VERBOSE=0",
+		// we don't want to build these images as we don't use them ...
+		"KUBE_BUILD_HYPERKUBE=n",
+		"KUBE_BUILD_CONFORMANCE=n",
+		// build for the host platform
+		"KUBE_BUILD_PLATFORMS=" + dockerBuildOsAndArch(b.arch),
+	}
+
 	// we will pass through the environment variables, prepending defaults
 	// NOTE: if env are specified multiple times the last one wins
-	env := append(
-		[]string{
-			// ensure the build isn't especially noisy..
-			"KUBE_VERBOSE=0",
-			// we don't want to build these images as we don't use them ...
-			"KUBE_BUILD_HYPERKUBE=n",
-			"KUBE_BUILD_CONFORMANCE=n",
-			// build for the host platform
-			"KUBE_BUILD_PLATFORMS=" + dockerBuildOsAndArch(b.arch),
-			// leverage in-tree-cloud-provider-free builds by default
-			// https://github.com/kubernetes/kubernetes/pull/80353
-			"GOFLAGS=-tags=providerless",
-		},
-		os.Environ()...,
-	)
-	// build binaries
+	// NOTE: currently there are no defaults so this is essentially a deep copy
+	env := append([]string{}, os.Environ()...)
+	// binaries we want to build
 	what := []string{
 		// binaries we use directly
 		"cmd/kubeadm",
 		"cmd/kubectl",
 		"cmd/kubelet",
 	}
-	cmd := exec.Command(
-		"build/run.sh",
-		"make", "all", "WHAT="+strings.Join(what, " "),
-	).SetEnv(env...)
-	exec.InheritOutput(cmd)
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrap(err, "failed to build binaries")
-	}
 
-	// build images
-	cmd = exec.Command("make", "quick-release-images").SetEnv(env...)
+	// build images + binaries (binaries only on 1.21+)
+	cmd := exec.Command("make",
+		append(
+			[]string{
+				"quick-release-images",
+				"KUBE_EXTRA_WHAT=" + strings.Join(what, " "),
+			},
+			makeVars...,
+		)...,
+	).SetEnv(env...)
 	exec.InheritOutput(cmd)
 	if err := cmd.Run(); err != nil {
 		return nil, errors.Wrap(err, "failed to build images")
 	}
 
-	// capture version info
-	version, err := sourceVersion(b.kubeRoot)
-	if err != nil {
-		return nil, err
+	// KUBE_EXTRA_WHAT added in this commit
+	// https://github.com/kubernetes/kubernetes/commit/35061acc28a666569fdd4d1c8a7693e3c01e14be
+	if kubeVersion.LessThan(version.MustParseSemantic("v1.21.0-beta.1.153+35061acc28a666")) {
+		// on older versions we still need to build binaries separately
+		cmd = exec.Command(
+			"build/run.sh",
+			append(
+				[]string{
+					"make",
+					"all",
+					"WHAT=" + strings.Join(what, " "),
+				},
+				makeVars...,
+			)...,
+		).SetEnv(env...)
+		exec.InheritOutput(cmd)
+		if err := cmd.Run(); err != nil {
+			return nil, errors.Wrap(err, "failed to build binaries")
+		}
 	}
 
 	binDir := filepath.Join(b.kubeRoot,
@@ -128,7 +153,7 @@ func (b *dockerBuilder) Build() (Bits, error) {
 			filepath.Join(imageDir, "kube-scheduler.tar"),
 			filepath.Join(imageDir, "kube-proxy.tar"),
 		},
-		version: version,
+		version: sourceVersionRaw,
 	}, nil
 }
 

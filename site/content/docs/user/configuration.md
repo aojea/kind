@@ -5,18 +5,12 @@ menu:
     parent: "user"
     identifier: "user-configuration"
     weight: 3
+toc: true
+description: |-
+  This guide covers how to configure KIND cluster creation.
+  
+  We know this is currently a bit lacking and will expand it over time - PRs welcome!
 ---
-
-<h1>⚠️ This page is a stub! We're working on it! ⚠️ </h1>
-
-# Configuration
-
-This guide covers how to configure KIND cluster creation.
-
-We know this is currently a bit lacking right now and will expand it over time - PRs welcome!
-
-<!--TODO: TOC?-->
-
 ## Getting Started
 
 To configure kind cluster creation, you will need to create a [YAML] config file.
@@ -42,11 +36,64 @@ To use this config, place the contents in a file `config.yaml` and then run
 
 You can also include a full file path like `kind create cluster --config=/foo/bar/config.yaml`.
 
+The structure of the `Cluster` type is defined by a Go struct, which is described
+[here](https://pkg.go.dev/sigs.k8s.io/kind/pkg/apis/config/v1alpha4#Cluster).
+
+### A Note On CLI Parameters and Configuration Files
+
+Unless otherwise noted, parameters passed to the CLI take precedence over their
+equivalents in a config file. For example, if you invoke:
+
+{{< codeFromInline lang="bash" >}}
+kind create cluster --name my-cluster
+{{< /codeFromInline >}}
+
+The name `my-cluster` will be used regardless of the presence of that value in
+your config file.
+
 ## Cluster-Wide Options
 
 The following high level options are available.
 
 NOTE: not all options are documented yet!  We will fix this with time, PRs welcome!
+
+### Name Your Cluster
+
+You can give your cluster a name by specifying it in your config:
+
+{{< codeFromInline lang="yaml" >}}
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: app-1-cluster
+{{< /codeFromInline >}}
+
+### Feature Gates
+
+Kubernetes [feature gates] can be enabled cluster-wide across all Kubernetes
+components with the following config:
+
+{{< codeFromInline lang="yaml" >}}
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+featureGates:
+  # any feature gate can be enabled here with "Name": true
+  # or disabled here with "Name": false
+  # not all feature gates are tested, however
+  "CSIMigration": true
+{{< /codeFromInline >}}
+
+### Runtime Config
+
+Kubernetes API server runtime-config can be toggled using the `runtimeConfig`
+key, which maps to the `--runtime-config` [kube-apiserver flag](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/).
+This may be used to e.g. disable beta / alpha APIs.
+
+{{< codeFromInline lang="yaml" >}}
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+runtimeConfig:
+  "api/alpha": "false"
+{{< /codeFromInline >}}
 
 ### Networking
 
@@ -55,9 +102,35 @@ Multiple details of the cluster's networking can be customized under the
 
 #### IP Family
 
-KIND has limited support for IPv6 (and soon dual-stack!) clusters, you can switch
-from the default of IPv4 by setting:
+KIND has support for IPv4, IPv6 and dual-stack clusters, you can switch from the default of IPv4 by setting:
 
+##### IPv6 clusters
+You can run IPv6 single-stack clusters using `kind`, if the host that runs the docker containers support IPv6.
+Most operating systems / distros have IPv6 enabled by default, but you can check on Linux with the following command:
+
+```sh
+sudo sysctl net.ipv6.conf.all.disable_ipv6
+```
+
+You should see:
+
+```sh
+net.ipv6.conf.all.disable_ipv6 = 0
+```
+
+If you are using Docker on Windows or Mac, you will need to use an IPv4 port
+forward for the API Server from the host because IPv6 port forwards don't work
+on these platforms, you can do this with the following config:
+
+{{< codeFromInline lang="yaml" >}}
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  ipFamily: ipv6
+  apiServerAddress: 127.0.0.1
+{{< /codeFromInline >}}
+
+On Linux all you need is:
 
 {{< codeFromInline lang="yaml" >}}
 kind: Cluster
@@ -66,11 +139,15 @@ networking:
   ipFamily: ipv6
 {{< /codeFromInline >}}
 
-NOTE: you may need to [reconfigure your docker daemon](https://docs.docker.com/config/daemon/ipv6/) 
-to enable ipv6 in order to use this. 
+##### Dual Stack clusters
+You can run dual stack clusters using `kind` 0.11+, on kubernetes versions 1.20+.
 
-IPv6 does not work on docker for mac because port forwarding ipv6
-is not yet supported in docker for mac.
+{{< codeFromInline lang="yaml" >}}
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  ipFamily: dual
+{{< /codeFromInline >}}
 
 #### API Server
 
@@ -146,6 +223,8 @@ networking:
   kubeProxyMode: "ipvs"
 {{< /codeFromInline >}}
 
+To disable kube-proxy, set the mode to `"none"`.
+
 ### Nodes
 The `kind: Cluster` object has a `nodes` field containing a list of `node`
 objects. If unset this defaults to:
@@ -204,6 +283,11 @@ for persisting data, mounting through code etc.
 {{< codeFromFile file="static/examples/config-with-mounts.yaml" lang="yaml" >}}
 
 
+NOTE: If you are using Docker for Mac or Windows check that the hostPath is
+included in the Preferences -> Resources -> File Sharing.
+
+For more information see the [Docker file sharing guide.](https://docs.docker.com/docker-for-mac/#file-sharing)
+
 ### Extra Port Mappings
 
 Extra port mappings can be used to port forward to the kind nodes. This is a 
@@ -216,15 +300,78 @@ You may also want to see the [Ingress Guide].
 
 {{< codeFromFile file="static/examples/config-with-port-mapping.yaml" lang="yaml" >}}
 
+An example http pod mapping host ports to a container port.
 
-[Ingress Guide]: ./../ingress
+{{< codeFromInline lang="yaml">}}
+kind: Pod
+apiVersion: v1
+metadata:
+  name: foo
+spec:
+  containers:
+  - name: foo
+    image: hashicorp/http-echo:0.2.3
+    args:
+    - "-text=foo"
+    ports:
+    - containerPort: 5678
+      hostPort: 80
+{{< /codeFromInline >}}
+
+#### NodePort with Port Mappings
+
+To use port mappings with `NodePort`, the kind node `containerPort` and the service `nodePort` needs to be equal.
+
+{{< codeFromInline lang="yaml" >}}
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 30950
+    hostPort: 80
+{{< /codeFromInline >}}
+
+And then set `nodePort` to be 30950.
+
+{{< codeFromInline lang="yaml">}}
+kind: Pod
+apiVersion: v1
+metadata:
+  name: foo
+  labels:
+    app: foo
+spec:
+  containers:
+  - name: foo
+    image: hashicorp/http-echo:0.2.3
+    args:
+    - "-text=foo"
+    ports:
+    - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: foo
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    nodePort: 30950
+    port: 5678
+  selector:
+    app: foo
+{{< /codeFromInline >}}
+
+[Ingress Guide]: /docs/user/ingress
 
 ### Kubeadm Config Patches
 
-KIND uses [`kubeadm`](./../../design/principles/#leverage-existing-tooling) 
+KIND uses [`kubeadm`](/docs/design/principles/#leverage-existing-tooling) 
 to configure cluster nodes.
-Formally  KIND runs `kubeadm init` on the first control-plane node 
-which can be customized by using the kubeadm
+
+Formally  KIND runs `kubeadm init` on the first control-plane node, we can customize the flags by using the kubeadm
 [InitConfiguration](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file) 
 ([spec](https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2#InitConfiguration))
 
@@ -241,12 +388,26 @@ nodes:
         node-labels: "my-label=true"
 {{< /codeFromInline >}}
 
+If you want to do more customization, there are four configuration types available during `kubeadm init`: `InitConfiguration`, `ClusterConfiguration`, `KubeProxyConfiguration`, `KubeletConfiguration`. For example, we could override the apiserver flags by using the kubeadm [ClusterConfiguration](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/control-plane-flags/) ([spec](https://pkg.go.dev/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2#ClusterConfiguration)):
+
+{{< codeFromInline lang="yaml" >}}
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+        extraArgs:
+          enable-admission-plugins: NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook
+{{< /codeFromInline >}}
+
 On every additional node configured in the KIND cluster, 
 worker or control-plane (in HA mode),
 KIND runs `kubeadm join` which can be configured using the 
 [JoinConfiguration](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-join/#config-file)
 ([spec](https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2#JoinConfiguration))
-
 
 {{< codeFromInline lang="yaml" >}}
 kind: Cluster
@@ -271,3 +432,4 @@ nodes:
 {{< /codeFromInline >}}
 
 [YAML]: https://yaml.org/
+[feature gates]: https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/

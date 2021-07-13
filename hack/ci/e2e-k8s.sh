@@ -22,7 +22,6 @@ set -o errexit -o nounset -o xtrace
 # Settings:
 # SKIP: ginkgo skip regex
 # FOCUS: ginkgo focus regex
-# BUILD_TYPE: bazel or make
 # GA_ONLY: true  - limit to GA APIs/features as much as possible
 #          false - (default) APIs and features left at defaults
 # 
@@ -55,31 +54,6 @@ signal_handler() {
 }
 trap signal_handler INT TERM
 
-# build kubernetes / node image, e2e binaries, with bazel
-build_with_bazel() {
-  # possibly enable bazel build caching before building kubernetes
-  if [ "${BAZEL_REMOTE_CACHE_ENABLED:-false}" = "true" ]; then
-    create_bazel_cache_rcs.sh || true
-  fi
-
-  # build the node image w/ kubernetes
-  kind build node-image --type=bazel -v 1
-  # make sure we have e2e requirements
-  bazel build //cmd/kubectl //test/e2e:e2e.test //vendor/github.com/onsi/ginkgo/ginkgo
-
-  # free up memory by terminating bazel
-  bazel shutdown || true
-  pkill ^bazel || true
-
-  # ensure the e2e script will find our binaries ...
-  # https://github.com/kubernetes/kubernetes/issues/68306
-  # TODO: remove this, it was fixed in 1.13+
-  mkdir -p '_output/bin/'
-  cp 'bazel-bin/test/e2e/e2e.test' '_output/bin/'
-  PATH="$(dirname "$(find "${PWD}/bazel-bin/" -name kubectl -type f)"):${PATH}"
-  export PATH
-}
-
 # build kubernetes / node image, e2e binaries
 build() {
   # build the node image w/ kubernetes
@@ -90,21 +64,39 @@ build() {
 
 # up a cluster with kind
 create_cluster() {
+  # Grab the version of the cluster we're about to start
+  KUBE_VERSION="$(docker run --rm --entrypoint=cat "kindest/node:latest" /kind/version)"
+
+  # Default Log level for all components in test clusters
+  KIND_CLUSTER_LOG_LEVEL=${KIND_CLUSTER_LOG_LEVEL:-4}
+
+  # potentially enable --logging-format
+  kubelet_extra_args="      \"v\": \"${KIND_CLUSTER_LOG_LEVEL}\""
+  if [ -n "${KUBELET_LOG_FORMAT:-}" ]; then
+    case "${KUBE_VERSION}" in
+     v1.1[0-8].*)
+      echo "KUBELET_LOG_FORMAT is only supported on versions >= v1.19, got ${KUBE_VERSION}"
+      exit 1
+      ;;
+    *)
+      # NOTE: the indendation on the next line is meaningful!
+      kubelet_extra_args="${kubelet_extra_args}
+      \"logging-format\": \"${KUBELET_LOG_FORMAT}\""
+      ;;
+    esac
+  fi
 
   # JSON map injected into featureGates config
   feature_gates="{}"
   # --runtime-config argument value passed to the API server
-  runtime_config=""
+  runtime_config="{}"
 
   case "${GA_ONLY:-false}" in
   false)
     feature_gates="{}"
-    runtime_config=""
+    runtime_config="{}"
     ;;
-
   true)
-    # Grab the version of the cluster we're about to start
-    KUBE_VERSION="$(docker run --rm --entrypoint=cat "kindest/node:latest" /kind/version)"
     case "${KUBE_VERSION}" in
     v1.1[0-7].*)
       echo "GA_ONLY=true is only supported on versions >= v1.18, got ${KUBE_VERSION}"
@@ -113,24 +105,20 @@ create_cluster() {
     v1.18.*)
       echo "Limiting to GA APIs and features (plus certificates.k8s.io/v1beta1 and RotateKubeletClientCertificate) for ${KUBE_VERSION}"
       feature_gates='{"AllAlpha":false,"AllBeta":false,"RotateKubeletClientCertificate":true}'
-      runtime_config='api/alpha=false,api/beta=false,certificates.k8s.io/v1beta1=true'
+      runtime_config='{"api/alpha":"false", "api/beta":"false", "certificates.k8s.io/v1beta1":"true"}'
       ;;
     *)
       echo "Limiting to GA APIs and features for ${KUBE_VERSION}"
       feature_gates='{"AllAlpha":false,"AllBeta":false}'
-      runtime_config='api/alpha=false,api/beta=false'
+      runtime_config='{"api/alpha":"false", "api/beta":"false"}'
       ;;
     esac
     ;;
-
   *)
     echo "\$GA_ONLY set to '${GA_ONLY}'; supported values are true and false (default)"
     exit 1
     ;;
   esac
-
-# Default Log level for all components in test clusters
-KIND_CLUSTER_LOG_LEVEL=${KIND_CLUSTER_LOG_LEVEL:-4}
 
   # create the config file
   cat <<EOF > "${ARTIFACTS}/kind-config.yaml"
@@ -139,11 +127,13 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 networking:
   ipFamily: ${IP_FAMILY:-ipv4}
+  kubeProxyMode: ${KUBE_PROXY_MODE:-iptables}
 nodes:
 - role: control-plane
 - role: worker
 - role: worker
 featureGates: ${feature_gates}
+runtimeConfig: ${runtime_config}
 kubeadmConfigPatches:
 - |
   kind: ClusterConfiguration
@@ -151,7 +141,6 @@ kubeadmConfigPatches:
     name: config
   apiServer:
     extraArgs:
-      "runtime-config": "${runtime_config}"
       "v": "${KIND_CLUSTER_LOG_LEVEL}"
   controllerManager:
     extraArgs:
@@ -163,12 +152,12 @@ kubeadmConfigPatches:
   kind: InitConfiguration
   nodeRegistration:
     kubeletExtraArgs:
-      "v": "${KIND_CLUSTER_LOG_LEVEL}"
+${kubelet_extra_args}
   ---
   kind: JoinConfiguration
   nodeRegistration:
     kubeletExtraArgs:
-      "v": "${KIND_CLUSTER_LOG_LEVEL}"
+${kubelet_extra_args}
 EOF
   # NOTE: must match the number of workers above
   NUM_NODES=2
@@ -263,17 +252,8 @@ main() {
   # debug kind version
   kind version
 
-  # default to bazel
-  # TODO(bentheelder): remove this line once we've updated CI to explicitly choose
-  BUILD_TYPE="${BUILD_TYPE:-bazel}"
-
   # build kubernetes
-  if [ "${BUILD_TYPE:-}" = "bazel" ]; then
-    build_with_bazel
-  else
-    build
-  fi
-
+  build
   # in CI attempt to release some memory after building
   if [ -n "${KUBETEST_IN_DOCKER:-}" ]; then
     sync || true

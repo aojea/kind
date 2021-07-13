@@ -1,21 +1,22 @@
 ---
-title: "Initial"
+title: "Initial design"
 menu:
   main:
     parent: "design"
     identifier: "design-initial"
     weight: 2
+description: |-
+  This document covers some of the initial design for `kind`.
+
+  **NOTE**: Some of this is out of date relative to what is currently implemented.
+  This mostly exists for historical purposes, the [the original proposal][original proposal]
+  covers some more details.
+
+  Going forward the [design principles] may be more relevant.
+
+  [original proposal]: https://docs.google.com/document/d/1VL0shYfKl7goy5Zj4Rghpixbye4M8zs_N2gWoQTSKh0/
+  [design principles]: /docs/design/principles
 ---
-# Design
-
-This document covers some of the initial design for `kind`.
-
-**NOTE**: Some of this is out of date relative to what is currently implemented.
-This mostly exists for historical purposes, the [the original proposal][original proposal]
-covers some more details.
-
-Going forward the [design principles] may be more relevant.
-
 ## Overview
 
 `kind` or **k**ubernetes **in** **d**ocker is a suite of tooling for local 
@@ -106,10 +107,10 @@ we can simply list and delete containers with this label.
 [q-lee]: https://github.com/q-lee
 [sig-testing-post]: https://groups.google.com/d/msg/kubernetes-sig-testing/uVkosorBnVc/8DDC3qvMAwAJ
 [kubernetes-sig-testing]: https://groups.google.com/forum/#!forum/kubernetes-sig-testing
-[pkg/cluster]: https://github.com/kubernetes-sigs/kind/tree/master/pkg/cluster
+[pkg/cluster]: https://github.com/kubernetes-sigs/kind/tree/main/pkg/cluster
 [base-image.md]: /docs/design/base-image
 [node-image.md]: /docs/design/node-image
-[entrypoint]: https://github.com/kubernetes-sigs/kind/blob/master/images/base/files/usr/local/bin/entrypoint
+[entrypoint]: https://github.com/kubernetes-sigs/kind/blob/main/images/base/files/usr/local/bin/entrypoint
 [kubeconfig]: https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/
 [overlay network]: https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/#pod-network
 [design principles]: /docs/design/principles

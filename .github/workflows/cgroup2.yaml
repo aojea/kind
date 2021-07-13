@@ -1,0 +1,90 @@
+name: Cgroup v2
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  docker:
+    name: Cgroup v2
+    # nested virtualization is only available on macOS hosts
+    runs-on: macos-10.15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [docker, podman]
+        rootless: ["rootful", "rootless"]
+    env:
+      KIND_EXPERIMENTAL_PROVIDER: "${{ matrix.provider }}"
+      ROOTLESS: "${{ matrix.rootless }}"
+      HELPER: "./hack/ci/vagrant-helper.sh"
+      JOB_NAME: "cgroup2-${{ matrix.provider }}-${{ matrix.rootless }}"
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Boot Fedora
+        run: |
+          ln -sf ./hack/ci/Vagrantfile ./Vagrantfile
+          # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
+          # Spend up to 10 seconds on this
+          for i in {1..4}; do
+            if vagrant up; then
+              break
+            fi
+            vagrant destroy -f
+            sleep $i
+          done
+
+      - name: Set up Rootless Docker
+        if: ${{ matrix.provider == 'docker' && matrix.rootless == 'rootless' }}
+        run: |
+          # Disable SELinux for Rootless Docker, until the following PRs gets merged into Docker CE:
+          # - https://github.com/moby/moby/pull/42199 ("dockerd-rootless.sh: avoid /run/xtables.lock EACCES on SELinux hosts")
+          # - https://github.com/moby/moby/pull/42334 ("rootless: disable overlay2 if running with SELinux")
+          "$HELPER" sudo setenforce 0
+          # Disable the rootful daemon
+          "$HELPER" sudo systemctl disable --now docker
+          # Install the systemd unit
+          "$HELPER" dockerd-rootless-setuptool.sh install
+          # Modify the client config to use the rootless daemon by default
+          "$HELPER" docker context use rootless
+
+
+      - name: Set up Rootless Podman
+        if: ${{ matrix.provider == 'podman' && matrix.rootless == 'rootless' }}
+        run: |
+          # We have modprobe ip6_tables in Vagrantfile, but it seems we have to modprobe it once again
+          "$HELPER" sudo modprobe ip6_tables
+
+      - name: Show provider info
+        run: |
+          "$HELPER" "$KIND_EXPERIMENTAL_PROVIDER" info
+          "$HELPER" "$KIND_EXPERIMENTAL_PROVIDER" version
+
+      - name: Create a cluster
+        run: |
+          "$HELPER" kind create cluster -v7 --wait 10m --retain
+
+      - name: Get Cluster status
+        run: |
+          "$HELPER" kubectl wait --for=condition=ready pods --namespace=kube-system -l k8s-app=kube-dns
+          "$HELPER" kubectl get nodes -o wide
+          "$HELPER" kubectl get pods -A
+
+      - name: Export logs
+        if: always()
+        run: |
+          "$HELPER" kind export logs /tmp/kind/logs
+          mkdir -p /tmp/kind/logs
+          "$HELPER" tar cC /tmp/kind/logs . | tar xC /tmp/kind/logs
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: kind-logs-${{ env.JOB_NAME }}-${{ github.run_id }}
+          path: /tmp/kind/logs

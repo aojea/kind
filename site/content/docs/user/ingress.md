@@ -5,13 +5,9 @@ menu:
     parent: "user"
     identifier: "user-ingress"
     weight: 3
+description: |-
+  This guide covers setting up [ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) on a kind cluster.
 ---
-
-# Ingress
-
-This guide covers setting up [ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
-on a kind cluster.
-
 ## Setting Up An Ingress Controller
 
 We can leverage KIND's `extraPortMapping` config option when
@@ -120,7 +116,8 @@ Additional information about Contour can be found at: [projectcontour.io](https:
 ### Ingress NGINX
 
 {{< codeFromInline lang="bash" >}}
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
+VERSION=$(curl https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/stable.txt)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/${VERSION}/deploy/static/provider/kind/deploy.yaml
 {{< /codeFromInline >}}
 
 The manifests contains kind specific patches to forward the hostPorts to the

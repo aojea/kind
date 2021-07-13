@@ -5,10 +5,8 @@ menu:
     parent: "design"
     identifier: "node-image"
 ---
-# The Node Image
 
-
-**NOTE**: This may not completely cover the current implementation.
+> **NOTE**: This may not completely cover the current implementation.
 
 The ["node" image][node image] is a Docker image for running
 nested containers, systemd, and Kubernetes components.

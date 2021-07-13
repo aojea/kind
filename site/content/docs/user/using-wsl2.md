@@ -5,10 +5,11 @@ menu:
     parent: "user"
     identifier: "using-wsl2"
     weight: 3
+description: |-
+  Kind can run using Windows Subsystem for Linux 2 (WSL2) on Windows 10 May 2020 Update (build 19041). 
+  
+  All the tools needed to build or run kind work in WSL2, but some extra steps are needed to switch to WSL2. This page covers these steps in brief but also links to the official documentation if you would like more details.
 ---
-# Using WSL2
-
-Kind can run using Windows Subsystem for Linux 2 (WSL2) on Windows 10 May 2020 Update (build 19041). All the tools needed to build or run kind work in WSL2, but some extra steps are needed to switch to WSL2. This page covers these steps in brief but also links to the official documentation if you would like more details.
 
 ## Getting Windows 10
 
@@ -16,7 +17,7 @@ Download latest ISO at https://www.microsoft.com/en-us/software-download/windows
 
 ### Installing on a virtual machine
 
-> Note: this currently only works with Intel processors. The Hyper-V hypervisor used by WSL2 cannot run underneath another hypervisor on AMD processors.
+> **NOTE**: this currently only works with Intel processors. The Hyper-V hypervisor used by WSL2 cannot run underneath another hypervisor on AMD processors.
 
 Required Settings
 
@@ -63,8 +64,69 @@ Install Docker with WSL2 backend here: https://docs.docker.com/docker-for-window
 
 Now, move on to the [Quick Start](/docs/user/quick-start) to set up your cluster with kind.
 
+## Accessing a Kubernetes Service running in WSL2
+
+1. prepare cluster config with exported node port
+    {{< codeFromInline lang="yaml" >}}
+# cluster-config.yml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 30000
+    hostPort: 30000
+    protocol: TCP
+{{< /codeFromInline >}}
+
+1. create cluster `kind create cluster --config=cluster-config.yml`
+1. create deployment `kubectl create deployment nginx --image=nginx --port=80`
+1. create service `kubectl create service nodeport nginx --tcp=80:80 --node-port=30000`
+1. access service `curl localhost:30000`
+
+## Kubernetes Service with Session Affinity
+
+If you want to create a Kubernetes Service with `sessionAffinity: ClientIP` it will not be accessible (and neither will any Service created afterwards).
+WSL2 kernel is missing `xt_recent` kernel module, which is used by Kube Proxy to implement session affinity. You need to compile a custom kernel to enable this feature.
+
+1. Build a kernel with `xt_recent` kernel module enabled
+    {{< codeFromInline lang="bash" >}}
+docker run --name wsl-kernel-builder --rm -it ubuntu:latest bash
+
+WSL_COMMIT_REF=linux-msft-5.4.72 # change this line to the version you want to build
+
+# Install dependencies
+apt update
+apt install -y git build-essential flex bison libssl-dev libelf-dev bc
+
+# Checkout WSL2 Kernel repo
+mkdir src
+cd src
+git init
+git remote add origin https://github.com/microsoft/WSL2-Linux-Kernel.git
+git config --local gc.auto 0
+git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +${WSL_COMMIT_REF}:refs/remotes/origin/build/linux-msft-wsl-5.4.y
+git checkout --progress --force -B build/linux-msft-wsl-5.4.y refs/remotes/origin/build/linux-msft-wsl-5.4.y
+
+# Enable xt_recent kernel module
+sed -i 's/# CONFIG_NETFILTER_XT_MATCH_RECENT is not set/CONFIG_NETFILTER_XT_MATCH_RECENT=y/' Microsoft/config-wsl
+
+# Compile the kernel 
+make -j2 KCONFIG_CONFIG=Microsoft/config-wsl
+
+# From the host terminal copy the newly built kernel
+docker cp wsl-kernel-builder:/src/arch/x86/boot/bzImage .
+{{< /codeFromInline >}}
+1. Configure WSL to use newly built kernel: https://docs.microsoft.com/en-us/windows/wsl/wsl-config#configure-global-options-with-wslconfig
+
+   Create a `.wslconfig` file in `C:\Users\<your-user-name>\`:
+    {{< codeFromInline lang="toml" >}}
+[wsl2]
+kernel=c:\\path\\to\\your\\kernel\\bzImage
+{{< /codeFromInline >}}
+
 ## Helpful Tips for WSL2
 
-- If you want to shutdown the WSL2 instance to save memory or "reboot", open an admin PowerShell prompt and run `wsl <distro> --shutdown`. Closing a WSL2 window doesn't shut it down automatically.
+- If you want to terminate the WSL2 instance to save memory or "reboot", open an admin PowerShell prompt and run `wsl --terminate <distro>`. Closing a WSL2 window doesn't shut it down automatically.
 - You can check the status of all installed distros with `wsl --list --verbose`.
 - If you had a distro installed with WSL1, you can convert it to WSL2 with `wsl --set-version <distro> 2`

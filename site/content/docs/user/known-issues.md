@@ -5,16 +5,22 @@ menu:
     parent: "user"
     identifier: "known-issues"
     weight: 2
+description: |-
+  Having problems with kind? This guide covers some known problems and solutions / workarounds.
+
+  It may additionally be helpful to:
+
+  - check our [issue tracker]
+  - [file an issue][file an issue] (if there isn't one already)
+  - reach out and ask for help in [#kind] on the [kubernetes slack]
+
+  [issue tracker]: https://github.com/kubernetes-sigs/kind/issues
+  [file an issue]: https://github.com/kubernetes-sigs/kind/issues/new
+  [#kind]: https://kubernetes.slack.com/messages/CEKK1KTN2/
+  [kubernetes slack]: http://slack.k8s.io/
 ---
-# Known Issues
 
-Having problems with kind? This guide is covers some known problems and solutions / workarounds.
 
-It may additionally be helpful to:
-
-- check our [issue tracker]
-- [file an issue][file an issue] (if there isn't one already)
-- reach out and ask for help in [#kind] on the [kubernetes slack]
 
 ## Contents
 * [Kubectl Version Skew](#kubectl-version-skew) (Kubernetes limits supported version skew)
@@ -22,15 +28,17 @@ It may additionally be helpful to:
 * [Docker Installed With Snap](#docker-installed-with-snap) (snap filesystem restrictions problematic)
 * [Failure to Build Node Image](#failure-to-build-node-image) (usually need to increase resources)
 * [Failing to Properly Start Cluster](#failing-to-properly-start-cluster) (various causes)
+* [Failure to Create Cluster with Cgroups v2](#failure-to-create-cluster-with-cgroups-v2) (only supported for Kubernetes >= 1.19)
 * [Pod Errors Due to "too many open files"](#pod-errors-due-to-too-many-open-files) (likely [inotify] limits which are not namespaced)
 * [Docker Permission Denied](#docker-permission-denied) (ensure you have permission to use docker)
 * [Windows Containers](#windows-containers) (unsupported / infeasible)
-* [Non-AMD64 Architectures](#nonamd64-architectures) (images not pre-built yet)
+* [Non-AMD64 Architectures](#non-amd64-architectures) (images not pre-built yet)
 * [Unable to Pull Images](#unable-to-pull-images) (various)
 * [Chrome OS](#chrome-os) (unsupported)
 * [AppArmor](#apparmor) (may break things, consider disabling)
 * [IPv6 Port Forwarding](#ipv6-port-forwarding) (docker doesn't seem to implement this correctly)
-* [Fedora 32 Firewalld](#fedora32-firewalld) (nftables + docker broken, switch to iptables)
+* [Couldn't find an alternative telinit implementation to spawn](#docker-init-daemon-config)
+* [Fedora](#fedora) (various)
 
 ## Kubectl Version Skew
 
@@ -125,7 +133,7 @@ Flags:
   -h, --help                help for node-image
       --image string        name:tag of the resulting image to be built (default "kindest/node:latest")
       --kube-root string    Path to the Kubernetes source directory (if empty, the path is autodetected)
-      --type string         build type, one of [bazel, docker] (default "docker")
+      --type string         build type, default is docker (default "docker")
 
 Global Flags:
       --loglevel string   logrus log level [panic, fatal, error, warning, info, debug] (default "warning")
@@ -191,7 +199,15 @@ at the kubelet logs, which may have something like the following:
 Dec 07 00:37:53 kind-1-control-plane kubelet[688]: I1207 00:37:53.229561     688 eviction_manager.go:340] eviction manager: must evict pod(s) to reclaim ephemeral-storage
 Dec 07 00:37:53 kind-1-control-plane kubelet[688]: E1207 00:37:53.229638     688 eviction_manager.go:351] eviction manager: eviction thresholds have been met, but no pods are active to evict
 ```
+## Failure to Create Cluster with Cgroups v2
+Support for Cgroups v2 was introduced in Kubernetes 1.19 (see [release notes](https://v1-19.docs.kubernetes.io/docs/setup/release/notes/)). Accordingly, only Kubernetes versions >= 1.19 are supported on hosts using Cgroups v2.
 
+You can verify that you are hitting this issue by exporting the logs (`kind export logs`) and looking
+at the kubelet logs, which may have something like the following:
+```
+Feb 23 08:39:04 kind-control-plane kubelet[3031]: W0223 08:39:04.644052    3031 server.go:616] failed to get the kubelet's cgroup: mountpoint for cpu not found.  Kubelet system container metrics may be missing.
+Feb 23 08:39:04 kind-control-plane kubelet[3031]: F0223 08:39:04.644296    3031 server.go:274] failed to run Kubelet: mountpoint for  not found
+```
 ## Pod errors due to "too many open files"
 
 This may be caused by running out of [inotify](https://linux.die.net/man/7/inotify) resources. Resource limits are defined by `fs.inotify.max_user_watches` and `fs.inotify.max_user_instances` system variables. For example, in Ubuntu these default to 8192 and 128 respectively, which is not enough to create a cluster with many nodes.
@@ -220,6 +236,13 @@ open /home/user/.docker/config.json: permission denied
 
 To fix this problem, either follow the docker's docs [manage docker as a non root user][manage docker as a non root user],
 or try to use `sudo` before your commands (if you get `command not found` please check [this comment about sudo with kind][sudo with kind]).
+
+
+## Docker init daemon config
+
+Please make sure that when you use `kind`, you can't have `"init": true` in your `/etc/docker/daemon.json` because that will
+cause `/sbin/init` to show the following cryptic message *Couldn't find an alternative telinit implementation to spawn*.
+This has to to with `/sbin/init` not running as process id 1.
 
 ## Windows Containers
 
@@ -283,7 +306,9 @@ your workloads inside the cluster via the nodes IPv6 addresses.
 
 See Previous Discussion: [kind#1326]
 
-## Fedora32 Firewalld
+## Fedora
+
+### Firewalld
 
 On Fedora 32 [firewalld] moved to nftables backend by default.
 This seems to be incompatible with Docker, leading to KIND cluster nodes not
@@ -297,6 +322,17 @@ systemctl restart firewalld
 ```
 
 See [#1547 (comment)](https://github.com/kubernetes-sigs/kind/issues/1547#issuecomment-623756313)
+and [Docker and Fedora 32 article](https://fedoramagazine.org/docker-and-fedora-32/)
+
+### SELinux
+
+On Fedora 33 an update to the SELinux policy causes `kind create cluster` to fail with an error like
+
+```sh
+docker: Error response from daemon: open /dev/dma_heap: permission denied.
+```
+
+Although the policy has been fixed in Fedora 34, the fix has not been backported to Fedora 33 as of June 28, 2021. Putting SELinux in permissive mode (`setenforce 0`) is one known workaround. This disables SELinux until the next boot. For more details, see [kind#2296].
 
 [issue tracker]: https://github.com/kubernetes-sigs/kind/issues
 [file an issue]: https://github.com/kubernetes-sigs/kind/issues/new
@@ -311,6 +347,7 @@ See [#1547 (comment)](https://github.com/kubernetes-sigs/kind/issues/1547#issuec
 [kind#270]: https://github.com/kubernetes-sigs/kind/issues/270
 [kind#1179]: https://github.com/kubernetes-sigs/kind/issues/1179
 [kind#1326]: https://github.com/kubernetes-sigs/kind/issues/1326
+[kind#2296]: https://github.com/kubernetes-sigs/kind/issues/2296
 [moby#9939]: https://github.com/moby/moby/issues/9939
 [moby#17666]: https://github.com/moby/moby/issues/17666
 [Docker resource lims]: https://docs.docker.com/docker-for-mac/#advanced

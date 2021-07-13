@@ -1,4 +1,3 @@
-#!/bin/bash
 #!/usr/bin/env bash
 # Copyright 2020 The Kubernetes Authors.
 #
@@ -33,7 +32,7 @@ fi
 # We only need to do this setup on linux hosts
 if [ "$(uname)" == 'Linux' ]; then
   # NOTE: this is pinned to a digest for a reason!
-  docker run --rm --privileged multiarch/qemu-user-static@sha256:c772ee1965aa0be9915ee1b018a0dd92ea361b4fa1bcab5bbc033517749b2af4 --reset -p yes
+  docker run --rm --privileged tonistiigi/binfmt:qemu-v6.0.0@sha256:ce4d5a2a6ac4a189047fca2d71cbd901cc7beebacf538be95fccb3aca87cb2ec --install all
 fi
 
 # Ensure we use a builder that can leverage it (the default on linux will not)

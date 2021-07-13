@@ -1,0 +1,114 @@
+name: Podman
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  podman:
+    name: Podman
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        ipFamily: [ipv4, ipv6]
+        deployment: [singleNode, multiNode]
+        exclude:
+          - ipFamily: ipv6
+    env:
+      JOB_NAME: "podman-${{ matrix.deployment }}-${{ matrix.ipFamily }}"
+      KIND_EXPERIMENTAL_PROVIDER: "podman"
+      IP_FAMILY: ${{ matrix.ipFamily }}
+      PODMAN_VERSION: "stable"
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install kind
+        run: sudo make install INSTALL_DIR=/usr/local/bin
+
+      - name: Install kubectl
+        run: |
+          curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
+
+      - name: Enable ipv4 and ipv6 forwarding
+        run: |
+          sudo sysctl -w net.ipv6.conf.all.forwarding=1
+          sudo sysctl -w net.ipv4.ip_forward=1
+
+      - name: Setup podman
+        run: |
+          podman version
+          # podman requires dnsmasq for custom networks
+          # https://github.com/actions/virtual-environments/issues/2708
+          sudo apt-get update
+          sudo apt-get -y install dnsmasq
+
+      - name: Create single node cluster
+        if: ${{ matrix.deployment == 'singleNode' }}
+        run: |
+          cat <<EOF | sudo KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster -v7 --wait 1m --retain --config=-
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          networking:
+            ipFamily: ${IP_FAMILY}
+          nodes:
+          - role: control-plane
+            extraPortMappings:
+            - containerPort: 80
+              hostPort: 80
+              listenAddress: 0.0.0.0
+            - containerPort: 443
+              hostPort: 443
+              listenAddress: 0.0.0.0
+          EOF
+
+      - name: Create multi node cluster
+        if: ${{ matrix.deployment == 'multiNode' }}
+        run: |
+          cat <<EOF | sudo KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster -v7 --wait 1m --retain --config=-
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          networking:
+            ipFamily: ${IP_FAMILY}
+          nodes:
+          - role: control-plane
+          - role: worker
+          - role: worker
+          EOF
+
+      - name: Get Cluster status
+        run: |
+          # wait network is ready
+          sudo kubectl wait --for=condition=ready pods --namespace=kube-system -l k8s-app=kube-dns
+          sudo kubectl get nodes -o wide
+          sudo kubectl get pods -A
+
+        # TODO: implement this
+      - name: Load docker image
+        run: sudo KIND_EXPERIMENTAL_PROVIDER=podman kind load docker-image busybox:2
+        continue-on-error: true
+
+      - name: Export logs
+        if: always()
+        run: |
+          mkdir -p /tmp/kind/logs
+          sudo KIND_EXPERIMENTAL_PROVIDER=podman kind export logs /tmp/kind/logs
+          sudo chown -R $USER:$USER /tmp/kind/logs
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: kind-logs-${{ env.JOB_NAME }}-${{ github.run_id }}
+          path: /tmp/kind/logs
+
+      - name: Delete cluster
+        run: sudo KIND_EXPERIMENTAL_PROVIDER=podman kind delete cluster

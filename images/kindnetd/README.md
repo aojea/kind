@@ -1,6 +1,6 @@
 # kindnetd
 
-`kindnetd` is a simple networking daemon with the following responsibilites:
+`kindnetd` is a simple networking daemon with the following responsibilities:
 
 - IP masquerade (of traffic leaving the nodes that is headed out of the cluster)
 - Ensuring netlink routes to pod CIDRs via the host node IP for each
@@ -12,9 +12,9 @@ We use this to implement KIND's standard CNI / cluster networking configuration.
 
 ## Building
 
-cd to this directory on mac / linux with docker installed and run `./build.sh`.
+cd to this directory on mac / linux with docker installed and run `make quick`.
 
-To push an image run `./push-cross.sh`.
+To push an image run `make push`.
 
 [ptp]: https://github.com/containernetworking/plugins/tree/master/plugins/main/ptp/README.md
 [host-local]: https://github.com/containernetworking/plugins/blob/master/plugins/ipam/host-local/README.md

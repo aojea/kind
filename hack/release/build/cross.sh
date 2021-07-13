@@ -17,7 +17,7 @@
 set -o errexit -o nounset -o pipefail
 
 # cd to the repo root and setup go
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." &> /dev/null && pwd -P)"
 cd "${REPO_ROOT}"
 source hack/build/setup-go.sh
 
@@ -42,8 +42,15 @@ else
 fi < <(cat <<EOF | tr '\n' '\0'
 export GOOS=windows GOARCH=amd64
 export GOOS=darwin GOARCH=amd64
+export GOOS=darwin GOARCH=arm64
 export GOOS=linux GOARCH=amd64
 export GOOS=linux GOARCH=arm64
 export GOOS=linux GOARCH=ppc64le
 EOF
 )
+
+# add sha256 for binaries
+cd "${REPO_ROOT}"/bin
+for f in kind-*; do
+    shasum -a 256 "$f" > "$f".sha256sum;
+done

@@ -1,12 +1,12 @@
 ---
-tile: kind
+title: kind
 ---
 <p style="text-align: center; margin-top: 2em; margin-bottom: -.75em;"><img alt="kind" src="./logo/logo.png" width="300px" /></p>
 
 [kind] is a tool for running local Kubernetes clusters using Docker container "nodes".  
 kind was primarily designed for testing Kubernetes itself, but may be used for local development or CI.
 
-If you have [go] \([1.11+][go-supported]) and [docker] installed `GO111MODULE="on" go get sigs.k8s.io/kind@v0.8.1 && kind create cluster` is all you need!
+If you have [go] \([1.11+][go-supported]) and [docker] installed `GO111MODULE="on" go get sigs.k8s.io/kind@{{< stableVersion >}} && kind create cluster` is all you need!
 
 <img src="images/kind-create-cluster.png" />
 
@@ -66,8 +66,8 @@ The maintainers of this project are reachable via:
 - [filing an issue] against this repo
 - The Kubernetes [SIG-Testing Mailing List]
 
-Current maintainers are [@BenTheElder] and [@munnerz] - feel free to
-reach out if you have any questions!
+Current maintainers are [@BenTheElder], [@munnerz], [@aojea], and [@amwat] -- feel free to
+reach out directly if you have any questions!
 
 Pull Requests are very welcome!  
 If you're planning a new feature, please file an issue to discuss first.
@@ -81,9 +81,9 @@ See also: our own [contributor guide] and the Kubernetes [community page].
 
 - kind supports multi-node (including HA) clusters
 - kind supports building Kubernetes release builds from source
-  - support for make / bash / docker, or bazel, in addition to pre-published builds
+  - support for make / bash or docker, in addition to pre-published builds
 - kind supports Linux, macOS and Windows
-- kind is a [CNCF certified conformant Kubernetes installer](https://landscape.cncf.io/selected=kind)
+- kind is a [CNCF certified conformant Kubernetes installer](https://landscape.cncf.io/?selected=kind)
 
 ### Code of conduct
 
@@ -99,11 +99,11 @@ Participation in the Kubernetes community is governed by the [Kubernetes Code of
 [Go Report Card Badge]: https://goreportcard.com/badge/sigs.k8s.io/kind
 [Go Report Card]: https://goreportcard.com/report/sigs.k8s.io/kind
 [conformance tests]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/conformance-tests.md
-[packages]: https://github.com/kubernetes-sigs/kind/tree/master/pkg
-[cluster package]: https://github.com/kubernetes-sigs/kind/tree/master/pkg/cluster
-[build package]: https://github.com/kubernetes-sigs/kind/tree/master/pkg/build
-[kind cli]: https://github.com/kubernetes-sigs/kind/tree/master/main.go
-[images]: https://github.com/kubernetes-sigs/kind/tree/master/images
+[packages]: https://github.com/kubernetes-sigs/kind/tree/main/pkg
+[cluster package]: https://github.com/kubernetes-sigs/kind/tree/main/pkg/cluster
+[build package]: https://github.com/kubernetes-sigs/kind/tree/main/pkg/build
+[kind cli]: https://github.com/kubernetes-sigs/kind/tree/main/main.go
+[images]: https://github.com/kubernetes-sigs/kind/tree/main/images
 [kubetest]: https://github.com/kubernetes/test-infra/tree/master/kubetest
 [kubeadm]: https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm/
 [design doc]: ./docs/design/initial
@@ -117,4 +117,6 @@ Participation in the Kubernetes community is governed by the [Kubernetes Code of
 [install docker]: https://docs.docker.com/install/
 [@BenTheElder]: https://github.com/BenTheElder
 [@munnerz]: https://github.com/munnerz
+[@aojea]: https://github.com/aojea
+[@amwat]: https://github.com/amwat
 [contributor guide]: /docs/contributing/getting-started
