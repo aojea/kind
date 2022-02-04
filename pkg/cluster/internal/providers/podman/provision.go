@@ -148,6 +148,12 @@ func commonArgs(cfg *config.Cluster, networkName string) ([]string, error) {
 		args = append(args, "--volume", "/dev/mapper:/dev/mapper")
 	}
 
+	// rootless: use fuse-overlayfs by default
+	// https://github.com/kubernetes-sigs/kind/issues/2275
+	if mountFuse() {
+		args = append(args, "--device", "/dev/fuse")
+	}
+
 	return args, nil
 }
 
@@ -186,9 +192,6 @@ func runArgsForNode(node *config.Node, clusterIPFamily config.ClusterIPFamily, n
 		"--volume", "/lib/modules:/lib/modules:ro",
 		// propagate KIND_EXPERIMENTAL_CONTAINERD_SNAPSHOTTER to the entrypoint script
 		"-e", "KIND_EXPERIMENTAL_CONTAINERD_SNAPSHOTTER",
-		// enable /dev/fuse explicitly for fuse-overlayfs
-		// (Rootless Podman does not automatically mount /dev/fuse with --privileged)
-		"--device", "/dev/fuse",
 	},
 		args...,
 	)

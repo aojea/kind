@@ -17,6 +17,7 @@ limitations under the License.
 package docker
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"strings"
 
@@ -84,4 +85,35 @@ func mountDevMapper() bool {
 	}
 
 	return storage == "btrfs" || storage == "zfs" || storage == "xfs"
+}
+
+// rootless: use fuse-overlayfs by default
+// https://github.com/kubernetes-sigs/kind/issues/2275
+func mountFuse() bool {
+	cmd := exec.Command("docker", "info", "--format", "{{json .}}")
+	out, err := exec.Output(cmd)
+	if err != nil {
+		return false
+	}
+	var dInfo dockerInfo
+	if err := json.Unmarshal(out, &dInfo); err != nil {
+		return false
+	}
+
+	for _, o := range dInfo.SecurityOptions {
+		// o is like "name=seccomp,profile=default", or "name=rootless",
+		csvReader := csv.NewReader(strings.NewReader(o))
+		sliceSlice, err := csvReader.ReadAll()
+		if err != nil {
+			return false
+		}
+		for _, f := range sliceSlice {
+			for _, ff := range f {
+				if ff == "name=rootless" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

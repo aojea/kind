@@ -150,3 +150,19 @@ type podmanStorageInfo struct {
 		} `json:"graphStatus"`
 	} `json:"store"`
 }
+
+// rootless: use fuse-overlayfs by default
+// https://github.com/kubernetes-sigs/kind/issues/2275
+func mountFuse() bool {
+	cmd := exec.Command("podman", "info", "--format", "json")
+	out, err := exec.Output(cmd)
+	if err != nil {
+		return false
+	}
+	var pInfo podmanInfo
+	if err := json.Unmarshal(out, &pInfo); err != nil {
+		return false
+	}
+
+	return pInfo.Host.Security.Rootless
+}
