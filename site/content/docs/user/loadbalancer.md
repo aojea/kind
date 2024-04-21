@@ -6,69 +6,29 @@ menu:
     identifier: "user-loadbalancer"
     weight: 3
 description: |-
-    This guide covers how to get service of type LoadBalancer working in a kind cluster using [Metallb].
+    This guide covers how to get service of type LoadBalancer working in a kind cluster using [Cloud Provider KIND].
 
-    This guide complements metallb [installation docs], and sets up metallb using layer2 protocol.  For other protocols check metallb [configuration docs].
+    This guide complements Cloud Provider KIND [installation docs].
 
-    With Docker on Linux, you can send traffic directly to the loadbalancer's external IP if the IP space is within the docker IP space.  
-    
-    On macOS and Windows, docker does not expose the docker network to the host.  Because of this limitation, containers (including kind nodes) are only reachable from the host via port-forwards, however other containers/pods can reach other things running in docker including loadbalancers.  You may want to check out the [Ingress Guide] as a cross-platform workaround.  You can also expose pods and services using extra port mappings as shown in the extra port mappings section of the [Configuration Guide].
-    
-
-    [Metallb]: https://metallb.universe.tf/
-    [installation docs]: https://metallb.universe.tf/installation/
-    [configuration docs]: https://metallb.universe.tf/configuration/
+    [Cloud Provider KIND]: https://github.com/kubernetes-sigs/cloud-provider-kind
+    [installation docs]: https://github.com/kubernetes-sigs/cloud-provider-kind?tab=readme-ov-file#install
 
     [Ingress Guide]: /docs/user/ingress
     [Configuration Guide]: /docs/user/configuration#extra-port-mappings
 
 ---
 
-## Installing metallb using default manifests
+## Installing Cloud Provider KIND
 
-### Create the metallb namespace
-
-{{< codeFromInline lang="bash" >}}
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/master/manifests/namespace.yaml
-{{< /codeFromInline >}}
-
-### Create the memberlist secrets
+Cloud Provider KIND can be installed using golang
 
 {{< codeFromInline lang="bash" >}}
-kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)" 
+go install sigs.k8s.io/cloud-provider-kind@latest
 {{< /codeFromInline >}}
 
-### Apply metallb manifest
+or downloading one of the [released binaries](https://github.com/kubernetes-sigs/cloud-provider-kind/releases).
 
-{{< codeFromInline lang="bash" >}}
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/master/manifests/metallb.yaml
-{{< /codeFromInline >}}
-
-Wait for metallb pods to have a status of Running
-
-{{< codeFromInline lang="bash" >}}
-kubectl get pods -n metallb-system --watch
-{{< /codeFromInline >}}
-
-### Setup address pool used by loadbalancers
-
-To complete layer2 configuration, we need to provide metallb a range of IP addresses it controls.  We want this range to be on the docker kind network.
-
-{{< codeFromInline lang="bash" >}}
-docker network inspect -f '{{.IPAM.Config}}' kind
-{{< /codeFromInline >}}
-
-The output will contain a cidr such as 172.19.0.0/16.  We want our loadbalancer IP range to come from this subclass.  We can configure metallb, for instance, to use 172.19.255.200 to 172.19.255.250 by creating the configmap.
-
-```yaml
-{{% readFile "static/examples/loadbalancer/metallb-configmap.yaml" %}}
-```
-
-Apply the contents
-
-{{< codeFromInline lang="bash" >}}
-kubectl apply -f https://kind.sigs.k8s.io/examples/loadbalancer/metallb-configmap.yaml
-{{< /codeFromInline >}}
+Cloud Provider KIND runs as a standalone binary in your host and connects to your KIND cluster and provisions new Load Balancer containers for your Services. It requires privileges to open ports on the system and to connect to the container runtime.
 
 ## Using LoadBalancer
 
@@ -77,6 +37,7 @@ The following example creates a loadbalancer service that routes to two http-ech
 ```yaml
 {{% readFile "static/examples/loadbalancer/usage.yaml" %}}
 ```
+
 Apply the contents
 
 {{< codeFromInline lang="yaml" >}}
@@ -95,7 +56,3 @@ for _ in {1..10}; do
   curl ${LB_IP}:5678
 done
 ```
-
-
-
-

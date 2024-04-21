@@ -5,6 +5,11 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - 'site/**'
+
+permissions:
+  contents: read
 
 jobs:
   podman:
@@ -25,7 +30,7 @@ jobs:
       PODMAN_VERSION: "stable"
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           fetch-depth: 0
 
@@ -34,7 +39,7 @@ jobs:
 
       - name: Install kubectl
         run: |
-          curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+          curl -LO https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
           chmod +x ./kubectl
           sudo mv ./kubectl /usr/local/bin/kubectl
 
@@ -50,6 +55,11 @@ jobs:
           # https://github.com/actions/virtual-environments/issues/2708
           sudo apt-get update
           sudo apt-get -y install dnsmasq
+          # crun >= 1.9.1 is required on Ubuntu 20.04.6
+          # https://github.com/kubernetes-sigs/kind/issues/3526
+          curl -Lo ./crun https://github.com/containers/crun/releases/download/1.14.3/crun-1.14.3-linux-amd64
+          chmod +x ./crun
+          sudo mv ./crun /usr/bin/crun
 
       - name: Create single node cluster
         if: ${{ matrix.deployment == 'singleNode' }}
@@ -105,7 +115,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
         with:
           name: kind-logs-${{ env.JOB_NAME }}-${{ github.run_id }}
           path: /tmp/kind/logs

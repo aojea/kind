@@ -236,11 +236,11 @@ func makeNodesReconciler(cniConfig *CNIConfigWriter, hostIP string, ipFamily IPF
 		}
 
 		// This is another node. Add routes to the POD subnets in the other nodes
-		// don't do anything unless there is a PodCIDR
+		// don't do anything unless there is a non-empty PodCIDR
 		var podCIDRs []string
 		if ipFamily == DualStackFamily {
 			podCIDRs = node.Spec.PodCIDRs
-		} else {
+		} else if node.Spec.PodCIDR != "" {
 			podCIDRs = []string{node.Spec.PodCIDR}
 		}
 		if len(podCIDRs) == 0 {
@@ -252,7 +252,7 @@ func makeNodesReconciler(cniConfig *CNIConfigWriter, hostIP string, ipFamily IPF
 
 		// obtain the PodCIDR gateway
 		var nodeIPv4, nodeIPv6 string
-		for _, ip := range nodeIPs.List() {
+		for _, ip := range sets.List(nodeIPs) {
 			if isIPv6String(ip) {
 				nodeIPv6 = ip
 			} else {
@@ -285,8 +285,8 @@ func makeNodesReconciler(cniConfig *CNIConfigWriter, hostIP string, ipFamily IPF
 }
 
 // internalIPs returns the internal IP addresses for node
-func internalIPs(node corev1.Node) sets.String {
-	ips := sets.NewString()
+func internalIPs(node corev1.Node) sets.Set[string] {
+	ips := sets.New[string]()
 	// check the node.Status.Addresses
 	for _, address := range node.Status.Addresses {
 		if address.Type == "InternalIP" {

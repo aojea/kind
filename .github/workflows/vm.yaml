@@ -1,16 +1,21 @@
-name: Cgroup v2
+name: VM
 
 on:
   workflow_dispatch:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - 'site/**'
+
+permissions:
+  contents: read
 
 jobs:
-  docker:
-    name: Cgroup v2
-    # nested virtualization is only available on macOS hosts
-    runs-on: macos-10.15
+  vm:
+    # Fedora is different from Ubuntu in LSM (SELinux), filesystem (btrfs), kernel version, etc.
+    name: "VM (Fedora)"
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -24,8 +29,17 @@ jobs:
       JOB_NAME: "cgroup2-${{ matrix.provider }}-${{ matrix.rootless }}"
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 
+      # https://github.com/containerd/containerd/blob/420503072e58f27a7192ddea4e6e41dced911cb9/.github/workflows/ci.yml#L569-L581
+      - name: Set up vagrant
+        run: |
+          # Canonical's Vagrant 2.2.19 dpkg cannot download Fedora 38 image: https://bugs.launchpad.net/vagrant/+bug/2017828
+          # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update
+          sudo apt-get install -y vagrant virtualbox
       - name: Boot Fedora
         run: |
           ln -sf ./hack/ci/Vagrantfile ./Vagrantfile
@@ -42,10 +56,6 @@ jobs:
       - name: Set up Rootless Docker
         if: ${{ matrix.provider == 'docker' && matrix.rootless == 'rootless' }}
         run: |
-          # Disable SELinux for Rootless Docker, until the following PRs gets merged into Docker CE:
-          # - https://github.com/moby/moby/pull/42199 ("dockerd-rootless.sh: avoid /run/xtables.lock EACCES on SELinux hosts")
-          # - https://github.com/moby/moby/pull/42334 ("rootless: disable overlay2 if running with SELinux")
-          "$HELPER" sudo setenforce 0
           # Disable the rootful daemon
           "$HELPER" sudo systemctl disable --now docker
           # Install the systemd unit
@@ -53,10 +63,12 @@ jobs:
           # Modify the client config to use the rootless daemon by default
           "$HELPER" docker context use rootless
 
-
       - name: Set up Rootless Podman
         if: ${{ matrix.provider == 'podman' && matrix.rootless == 'rootless' }}
         run: |
+          # Restart the user session to ensure the cgroup delegation
+          # ref: https://github.com/kubernetes-sigs/kind/pull/2754#issuecomment-1124027063
+          "$HELPER" sudo loginctl terminate-user vagrant || true
           # We have modprobe ip6_tables in Vagrantfile, but it seems we have to modprobe it once again
           "$HELPER" sudo modprobe ip6_tables
 
@@ -84,7 +96,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
         with:
           name: kind-logs-${{ env.JOB_NAME }}-${{ github.run_id }}
           path: /tmp/kind/logs

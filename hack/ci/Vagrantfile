@@ -1,15 +1,16 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Vagrant box for testing kind with cgroup v2
+# Vagrant box for testing kind with non-Ubuntu
 Vagrant.configure("2") do |config|
-  # `config.vm.box = "fedora/34-cloud-base"` seems flaky,
+  # `config.vm.box = "fedora/37-cloud-base"` seems flaky,
   # so we specify the URL explicitly.
-  # Mirrors can be found at here: https://admin.fedoraproject.org/mirrormanager/mirrors/Fedora/34/x86_64
+  # Mirrors can be found at here: https://admin.fedoraproject.org/mirrormanager/mirrors/Fedora/37/x86_64
   config.vm.box = "dummy"
-  config.vm.box_url = "https://iad.mirror.rackspace.com/fedora/releases/34/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-34-1.2.x86_64.vagrant-virtualbox.box"
-  memory = 2048
-  cpus = 2
+  config.vm.box_url = "https://iad.mirror.rackspace.com/fedora/releases/37/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-37-1.7.x86_64.vagrant-virtualbox.box"
+  # assume some ram is needed for the host environment but very little CPU
+  memory = 10240
+  cpus = 3
   config.vm.provider :virtualbox do |v|
     v.memory = memory
     v.cpus = cpus
@@ -39,6 +40,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision "install-kind", type: "shell", run: "once" do |sh|
     sh.inline = <<~SHELL
     set -eux -o pipefail
+    git config --global --add safe.directory /vagrant
     make -C /vagrant install INSTALL_DIR=/usr/local/bin
     SHELL
   end
