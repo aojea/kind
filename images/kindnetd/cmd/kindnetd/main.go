@@ -28,14 +28,16 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/knftables"
+	"sigs.k8s.io/kube-network-policies/pkg/networkpolicy"
 )
 
 const (
@@ -78,6 +80,9 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+	// use protobuf to improve performance
+	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	config.ContentType = "application/vnd.kubernetes.protobuf"
 
 	// override the internal apiserver endpoint to avoid
 	// waiting for kube-proxy to install the services rules.
@@ -205,6 +210,41 @@ func main() {
 	// setup nodes reconcile function, closes over arguments
 	reconcileNodes := makeNodesReconciler(cniConfigWriter, hostIP, ipFamily)
 
+	// network policies
+
+	// on kind nodes the hostname matches the node name
+	nodeName, err := os.Hostname()
+	if err != nil {
+		klog.Fatalf("couldn't determine hostname: %w", err)
+	}
+
+	nft, err := knftables.New(knftables.InetFamily, "kube-network-policies")
+	if err != nil {
+		klog.Infof("Error initializing nftables: %v, skipping network policies", err)
+	} else {
+		cfg := networkpolicy.Config{
+			FailOpen: true,
+			QueueID:  100,
+			NodeName: nodeName,
+		}
+
+		networkPolicyController := networkpolicy.NewController(
+			clientset,
+			nft,
+			informersFactory.Networking().V1().NetworkPolicies(),
+			informersFactory.Core().V1().Namespaces(),
+			informersFactory.Core().V1().Pods(),
+			nodeInformer,
+			nil,
+			nil,
+			nil,
+			cfg,
+		)
+		go func() {
+			_ = networkPolicyController.Run(ctx)
+		}()
+	}
+
 	// main control loop
 	informersFactory.Start(ctx.Done())
 	ticker := time.NewTicker(10 * time.Second)
@@ -250,7 +290,7 @@ func main() {
 }
 
 // nodeNodesReconciler returns a reconciliation func for nodes
-func makeNodesReconciler(cniConfig *CNIConfigWriter, hostIP string, ipFamily IPFamily, clientset *kubernetes.Clientset) func([]*corev1.Node) error {
+func makeNodesReconciler(cniConfig *CNIConfigWriter, hostIP string, ipFamily IPFamily) func([]*corev1.Node) error {
 	// reconciles a node
 	reconcileNode := func(node *corev1.Node) error {
 		// first get this node's IPs
@@ -288,7 +328,7 @@ func makeNodesReconciler(cniConfig *CNIConfigWriter, hostIP string, ipFamily IPF
 
 		// obtain the PodCIDR gateway
 		var nodeIPv4, nodeIPv6 string
-		for _, ip := range sets.List(nodeIPs) {
+		for _, ip := range nodeIPs.UnsortedList() {
 			if isIPv6String(ip) {
 				nodeIPv6 = ip
 			} else {
@@ -321,7 +361,7 @@ func makeNodesReconciler(cniConfig *CNIConfigWriter, hostIP string, ipFamily IPF
 }
 
 // internalIPs returns the internal IP addresses for node
-func internalIPs(node *corev1.Node) sets.String {
+func internalIPs(node *corev1.Node) sets.Set[string] {
 	ips := sets.New[string]()
 	// check the node.Status.Addresses
 	for _, address := range node.Status.Addresses {
