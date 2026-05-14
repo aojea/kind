@@ -20,7 +20,7 @@ package nodeimage
 The default CNI manifest and images are our own tiny kindnet
 */
 
-const kindnetdImage = "docker.io/kindest/kindnetd:v20240202-8f1494ea"
+const kindnetdImage = "docker.io/kindest/kindnetd:v20260213-ea8e5717"
 
 var defaultCNIImages = []string{kindnetdImage}
 
@@ -47,6 +47,15 @@ rules:
       - ""
     resources:
       - nodes
+      - pods
+      - namespaces
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+     - "networking.k8s.io"
+    resources:
+      - networkpolicies
     verbs:
       - list
       - watch
@@ -95,6 +104,7 @@ spec:
         kubernetes.io/os: linux
       tolerations:
       - operator: Exists
+      priorityClassName: system-node-critical
       serviceAccountName: kindnet
       containers:
       - name: kindnet-cni
@@ -119,6 +129,8 @@ spec:
         - name: lib-modules
           mountPath: /lib/modules
           readOnly: true
+        - name: nri-plugin
+          mountPath: /var/run/nri
         resources:
           requests:
             cpu: "100m"
@@ -141,5 +153,8 @@ spec:
       - name: lib-modules
         hostPath:
           path: /lib/modules
+      - name: nri-plugin
+        hostPath:
+          path: /var/run/nri
 ---
 `
